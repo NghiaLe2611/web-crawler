@@ -2,47 +2,63 @@ const puppeteer = require('puppeteer');
 const fs = require('fs');
 
 (async () => {
-	const browser = await puppeteer.launch({ headless: false });
-	const page = await browser.newPage();
-	// page.setViewport({ width: 1280, height: 720 });
-	await page.goto(
-		'https://www.ketquadientoan.com/tat-ca-ky-xo-so-power-655.html'
-		// { waitUntil: 'networkidle2' },
-	);
-	// await page.screenshot({ path: 'kenh14.png' });
+	try {
+		// const browser = await puppeteer.launch({ 
+		// 	headless: false, 
+		// 	defaultViewport: null, 
+		// });
+		const browser = await puppeteer.launch(
+			{
+			  headless: false, //defaults to true 
+			  defaultViewport: null, //Defaults to an 800x600 viewport
+			  executablePath: 'C:/Program Files/Google/Chrome/Application/chrome.exe', 
+							 //by default puppeteer runs Chromium buddled with puppeteer 
+			  args:['--start-maximized' ]
+			});
+		const page = await browser.newPage();
+		// page.setViewport({ width: 1280, height: 720 });
+		await page.goto(
+			'https://www.ketquadientoan.com/tat-ca-ky-xo-so-power-655.html'
+			// { waitUntil: 'networkidle2' },
+		);
 
-	// Extract data from the website
-	const result = await page.evaluate(() => {
-		const data = [];
-		// Get all table rows with the class "table-mini-result"
-		const tableRows = document.querySelectorAll('.table-mini-result tr');
+		// await page.screenshot({ path: 'kenh14.png' });
 
-		// Iterate over each table row
-		tableRows.forEach(function (row) {
-			const rowNumbers = [];
+		// Extract data from the website
+		const result = await page.evaluate(() => {
+			const data = [];
+			// Get all table rows with the class "table-mini-result"
+			const tableRows = document.querySelectorAll('.table-mini-result tr');
 
-			// Find all spans with the class "home-mini-whiteball" within the current table row
-			const number = row.querySelectorAll('.home-mini-whiteball');
+			// Iterate over each table row
+			tableRows.forEach(function (row) {
+				const rowNumbers = [];
 
-			// Iterate over each span and push its text content to the rowNumbers array
-			number.forEach(function (span) {
-				rowNumbers.push(span.textContent.trim());
+				// Find all spans with the class "home-mini-whiteball" within the current table row
+				const number = row.querySelectorAll('.home-mini-whiteball');
+
+				// Iterate over each span and push its text content to the rowNumbers array
+				number.forEach(function (span) {
+					rowNumbers.push(span.textContent.trim());
+				});
+
+				// Add the array of numbers from the current row to the main array
+				if (rowNumbers.length) {
+					data.push(rowNumbers);
+				}
 			});
 
-			// Add the array of numbers from the current row to the main array
-            if (rowNumbers.length) {
-                data.push(rowNumbers);
-            }
+			return data;
 		});
 
-		return data;
-	});
-	
-	console.log(result);
+		// console.log(result);
 
-	// Write data to json
-	fs.writeFileSync('output.json', JSON.stringify(result, null, 2));
-	console.log('Data has been written to output.json file.');
+		// Write data to json
+		fs.writeFileSync('output.json', JSON.stringify(result, null, 2));
+		console.log('Data has been written to output.json file.');
 
-	await browser.close();
+		await browser.close();
+	} catch (err) {
+		console.error('Error:', err);
+	}
 })();
