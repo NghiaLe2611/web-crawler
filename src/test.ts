@@ -3,22 +3,22 @@ const fs = require('fs');
 
 (async () => {
 	try {
-		// const browser = await puppeteer.launch({ 
-		// 	headless: false, 
-		// 	defaultViewport: null, 
+		// const browser = await puppeteer.launch({
+		// 	headless: false,
+		// 	defaultViewport: null,
 		// });
-		const browser = await puppeteer.launch(
-			{
-			  headless: false, //defaults to true 
-			  defaultViewport: null, //Defaults to an 800x600 viewport
-			  executablePath: 'C:/Program Files/Google/Chrome/Application/chrome.exe', 
-							 //by default puppeteer runs Chromium buddled with puppeteer 
-			  args:['--start-maximized' ]
-			});
+		const browser = await puppeteer.launch({
+			headless: false, //defaults to true
+			defaultViewport: null, //Defaults to an 800x600 viewport
+			executablePath:
+				// 'C:/Program Files/Google/Chrome/Application/chrome.exe',
+				'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',
+			args: ['--start-maximized'], //by default puppeteer runs Chromium buddled with puppeteer
+		});
 		const page = await browser.newPage();
 		// page.setViewport({ width: 1280, height: 720 });
 		await page.goto(
-			'https://www.ketquadientoan.com/tat-ca-ky-xo-so-power-655.html'
+			'https://www.ketquadientoan.com/tat-ca-ky-xo-so-power-655.html',
 			// { waitUntil: 'networkidle2' },
 		);
 
@@ -28,11 +28,17 @@ const fs = require('fs');
 		const result = await page.evaluate(() => {
 			const data = [];
 			// Get all table rows with the class "table-mini-result"
-			const tableRows = document.querySelectorAll('.table-mini-result tr');
+			const tableRows = document.querySelectorAll(
+				'.table-mini-result tr',
+			);
 
 			// Iterate over each table row
 			tableRows.forEach(function (row) {
 				const rowNumbers = [];
+
+				// Get date
+				const dateCell = row.querySelector('td:first-child');
+				console.log(123, dateCell);
 
 				// Find all spans with the class "home-mini-whiteball" within the current table row
 				const number = row.querySelectorAll('.home-mini-whiteball');
@@ -54,10 +60,10 @@ const fs = require('fs');
 		// console.log(result);
 
 		// Write data to json
-		fs.writeFileSync('output.json', JSON.stringify(result, null, 2));
-		console.log('Data has been written to output.json file.');
+		// fs.writeFileSync('output.json', JSON.stringify(result, null, 2));
+		// console.log('Data has been written to output.json file.');
 
-		await browser.close();
+		// await browser.close();
 	} catch (err) {
 		console.error('Error:', err);
 	}

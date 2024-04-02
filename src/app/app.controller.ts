@@ -11,9 +11,7 @@ export class AppController {
 		// Inject Request object
 		try {
 			const data = await this.appService.getHello();
-
 			// Access request properties (if needed)
-			console.log('res:', data);
             return res.json({
                 status: HttpStatus.OK,
                 data
