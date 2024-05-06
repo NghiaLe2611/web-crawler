@@ -13,6 +13,7 @@ import {
 } from '@nestjs/common';
 import { PuppeteerService } from './puppeteer.service';
 import { ScrapeResponse } from './puppeteer.interface';
+import { LotteryType } from 'src/types';
 
 @Controller('crawl')
 export class PuppeteerController {
@@ -20,11 +21,13 @@ export class PuppeteerController {
 
 	@Get('/lottery')
 	async scrapeData(
-		@Query('url') url = 'https://www.ketquadientoan.com/tat-ca-ky-xo-so-power-655.html',
-		// @Query('selector') selector: string,
+		@Query('type') type: LotteryType,
 	): Promise<ScrapeResponse> {
 		try {
-			const data = await this.puppeteerService.scrapeData(url);
+			const data = await this.puppeteerService.scrapeData(type);
+            if (!data) {
+                return { data, status: HttpStatus.BAD_REQUEST };
+            }
 			return { data, status: HttpStatus.OK };
 		} catch (error) {
 			throw new HttpException(

@@ -2,14 +2,21 @@ import { Injectable } from '@nestjs/common';
 import puppeteer from 'puppeteer';
 import fs from 'fs';
 import * as NodeCache from 'node-cache';
+import { LotteryType } from 'src/types';
+import { crawUrl } from 'src/constants';
 
 const cacheCrawlData = new NodeCache({ stdTTL: 4 * 60 * 60 }); // 4h
 
 @Injectable()
 export class PuppeteerService {
-	async scrapeData(url: string) {
+	async scrapeData(type: LotteryType) {
+		const url = LotteryType[type];
+
+		if (!url) {
+			return null;
+		}
 		// Check existed cache
-		const cachedData = cacheCrawlData.get('lottery_55');
+		const cachedData = cacheCrawlData.get(`lottery_${type}`);
 
 		if (cachedData) {
 			return cachedData as any[];
@@ -20,7 +27,7 @@ export class PuppeteerService {
 			const page = await browser.newPage();
 			// page.setViewport({ width: 1280, height: 720 });
 			await page.goto(
-				'https://www.ketquadientoan.com/tat-ca-ky-xo-so-power-655.html',
+				url,
 				// { waitUntil: 'networkidle2' },
 			);
 
@@ -37,7 +44,7 @@ export class PuppeteerService {
 					const rowNumbers = [];
 
 					// Get date
-                    const dateCell = row.querySelector('td:first-child');
+					const dateCell = row.querySelector('td:first-child');
 
 					// Find all spans with the class "home-mini-whiteball" within the current table row
 					const number = row.querySelectorAll('.home-mini-whiteball');
@@ -50,8 +57,9 @@ export class PuppeteerService {
 					// Add the array of numbers from the current row to the main array
 					if (rowNumbers.length) {
 						data.push({
-                            date: dateCell.textContent, numbers: rowNumbers
-                        });
+							date: dateCell.textContent,
+							numbers: rowNumbers,
+						});
 					}
 				});
 
@@ -65,7 +73,7 @@ export class PuppeteerService {
 			await browser.close();
 
 			// Cache data
-			cacheCrawlData.set('lottery_55', result);
+			cacheCrawlData.set(`lottery_${type}`, result);
 
 			return result;
 		} catch (err) {
