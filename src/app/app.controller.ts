@@ -10,14 +10,13 @@ export class AppController {
 	async getHello(@Req() req: Request, @Res() res: Response) {
 		// Inject Request object
 		try {
-			const data = await this.appService.getHello();
+			// const data = await this.appService.getHello();
 			// Access request properties (if needed)
             return res.json({
                 status: HttpStatus.OK,
-                data
+                message: 'OK',
+				env: process.env.NODE_ENV || 'development'
             });
-			return data;
-			// return res.send(data);
 		} catch (err) {
             return res.json({
                 status: HttpStatus.BAD_REQUEST,
