@@ -16,8 +16,7 @@ const corsConfig = corsEnv[process.env.NODE_ENV || 'development'];
 
 async function bootstrap() {
 	const app = await NestFactory.create(AppModule);
-	app.enableCors(corsConfig);
-	console.log(corsConfig);
+	app.enableCors();
 	await app.listen(PORT);
 }
 bootstrap();

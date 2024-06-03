@@ -23,7 +23,9 @@ export class PuppeteerService {
 		}
 
 		try {
-			const browser = await puppeteer.launch();
+			const browser = await puppeteer.launch({
+				ignoreHTTPSErrors: true
+			});
 			const page = await browser.newPage();
 			// page.setViewport({ width: 1280, height: 720 });
 			await page.goto(
