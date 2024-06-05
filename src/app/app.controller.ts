@@ -15,7 +15,8 @@ export class AppController {
             return res.json({
                 status: HttpStatus.OK,
                 message: 'OK',
-				env: process.env.NODE_ENV || 'development'
+				env: process.env.NODE_ENV || 'development',
+				user: process.env.TEST_USER || null
             });
 		} catch (err) {
             return res.json({
