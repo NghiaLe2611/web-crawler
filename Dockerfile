@@ -19,7 +19,17 @@ COPY . .
 RUN npm run build
 
 # Expose the port the app runs on
-EXPOSE 8080
+EXPOSE 5000
+
+# # Set environment variables
+# ARG NODE_ENV
+# ARG PORT
+# ARG DOMAINS
+
+# # Set environment variables for the runtime
+# ENV NODE_ENV=$NODE_ENV
+# ENV PORT=$PORT
+# ENV DOMAINS=$DOMAINS
 
 # Start app
 CMD [ "node", "dist/src/main.js" ]
