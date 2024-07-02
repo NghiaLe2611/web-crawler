@@ -1,0 +1,6 @@
+- python -m venv venv
+- .\venv\Scripts\activate
+- echo "Flask" > requirements.txt
+- pip install -r requirements.txt
+- python app.py
+- nodemon --exec python/python3 predict.py

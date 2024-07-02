@@ -1,4 +1,9 @@
 {
     "editor.fontFamily": "Cousine, 'MonoLisa','SF Mono', 'Courier New', monospace",
     "prettier.tabWidth": 4,
+    // {
+    // 	"python.analysis.diagnosticSeverityOverrides": {
+    // 		"reportMissingImports": "none"
+    // 	}
+    // }
 }

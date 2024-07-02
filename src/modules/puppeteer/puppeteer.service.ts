@@ -1,9 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import puppeteer from 'puppeteer';
-import fs from 'fs';
-import * as NodeCache from 'node-cache';
+import NodeCache from 'node-cache';
 import { LotteryType } from 'src/types';
-import { crawUrl } from 'src/constants';
 
 const cacheCrawlData = new NodeCache({ stdTTL: 4 * 60 * 60 }); // 4h
 
