@@ -181,6 +181,10 @@ const handlePredict = async () => {
     // Train the model
     const model = await trainModel(lotteryHistory);
 
+    // Load model
+    // const modelPath = path.resolve(__dirname, 'models/model_adam_meanSquaredError/model.json');
+    // const model = await tf.loadLayersModel(`file://${modelPath}`);
+
     // Make a prediction using the latest data
     const latestData = lotteryHistory[0].slice(0, 7); // Use the most recent 7 numbers as input
     const predictionTensor = model.predict(tf.tensor2d([latestData]));

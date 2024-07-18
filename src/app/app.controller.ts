@@ -13,14 +13,14 @@ export class AppController {
 			// const data = await this.appService.getHello();
 			// Access request properties (if needed)
             return res.json({
-                status: HttpStatus.OK,
+                statusCode: HttpStatus.OK,
                 message: 'OK',
 				env: process.env.NODE_ENV || 'development',
 				user: process.env.TEST_USER || null
             });
 		} catch (err) {
             return res.json({
-                status: HttpStatus.BAD_REQUEST,
+                statusCode: HttpStatus.BAD_REQUEST,
                 message: 'error'
             });
 		}
@@ -28,8 +28,7 @@ export class AppController {
 
 	@Get('test')
 	create(@Res() res: Response) {
-        return res.send('haha');
-		return res.status(HttpStatus.CREATED).send();
+        return res.send('test');
 	}
 
 	// getHello(): object {

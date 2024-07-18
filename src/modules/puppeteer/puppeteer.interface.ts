@@ -2,6 +2,6 @@ import { HttpStatus } from "@nestjs/common";
 
 export interface ScrapeResponse {
     data: any[];
-    status: HttpStatus;
+    statusCode: HttpStatus;
     message?: string;
 }

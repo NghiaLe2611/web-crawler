@@ -26,9 +26,9 @@ export class PuppeteerController {
 		try {
 			const data = await this.puppeteerService.scrapeData(type);
             if (!data) {
-                return { data, status: HttpStatus.BAD_REQUEST };
+                return { data, statusCode: HttpStatus.BAD_REQUEST };
             }
-			return { data, status: HttpStatus.OK };
+			return { data, statusCode: HttpStatus.OK };
 		} catch (error) {
 			throw new HttpException(
 				'Scraping failed: ' + error.message,
