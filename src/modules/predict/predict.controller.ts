@@ -1,6 +1,7 @@
 import {
 	Body,
 	Controller,
+	Delete,
 	Get,
 	HttpException,
 	HttpStatus,
@@ -9,22 +10,28 @@ import {
 	Res,
 } from '@nestjs/common';
 import { PredictService } from './predict.service';
-import { commonErrorMsg, defaultPredictParams } from 'src/constants';
+import {
+	commonErrorMsg,
+	defaultPredictParams,
+	MAX_NUMBER,
+} from 'src/constants';
+import * as path from 'path';
+import * as tf from '@tensorflow/tfjs-node';
 
-@Controller('predict')
+@Controller('/analyze')
 export class PredictController {
 	constructor(private readonly predictService: PredictService) {}
 
 	@Post('/train')
-	async trainModel(
+	async handleTrainModal(
 		@Body('data') lotteryHistory: number[][],
-		@Body('optimizer') optimizer: string,
-		@Body('loss') loss: string,
-		@Body('epochs') epochs: number,
+		@Body('optimizer') optimizer = 'adam',
+		@Body('loss') loss = 'meanSquaredError',
+		@Body('epochs') epochs = 100,
 		@Res() res: any,
 	) {
 		if (!lotteryHistory || !lotteryHistory?.length) {
-			return res.status(400).json({
+			return res.status(HttpStatus.BAD_REQUEST).json({
 				statusCode: HttpStatus.BAD_REQUEST,
 				message: 'History not found or is empty',
 			});
@@ -38,36 +45,87 @@ export class PredictController {
 				epochs,
 			);
 
-            if (result && result.model) {
-                return res.status(200).json({
-                    statusCode: HttpStatus.OK,
-                    message: 'Train data sucessfully',
-                    optimizer: optimizer || defaultPredictParams.optimizer,
-                    losses: loss || defaultPredictParams.loss,
-                    epochs: epochs || defaultPredictParams.epochs,
-                    loss: result.lastEpochLogs?.loss || null,
-                    acc: result.lastEpochLogs?.acc || null
-                });
-            }
+			if (result && result.model) {
+				return res.status(HttpStatus.OK).json({
+					statusCode: HttpStatus.OK,
+					message: 'Train data sucessfully',
+					optimizer: optimizer || defaultPredictParams.optimizer,
+					losses: loss || defaultPredictParams.loss,
+					epochs: epochs || defaultPredictParams.epochs,
+					loss: result.lastEpochLogs?.loss || null,
+					acc: result.lastEpochLogs?.acc || null,
+				});
+			}
 
-			return res.status(400).json({
+			return res.status(HttpStatus.BAD_REQUEST).json({
 				statusCode: HttpStatus.BAD_REQUEST,
-                message: commonErrorMsg
+				message: commonErrorMsg,
 			});
-		} catch (error) {
+		} catch (err) {
 			throw new HttpException(
-				error.message,
+				err.message,
 				HttpStatus.INTERNAL_SERVER_ERROR,
 			);
 		}
 	}
+
+	@Post('/predict')
+	async handlePredict(
+		@Body('data') lotteryHistory: number[][],
+		@Body('path')
+		modelPath = path.resolve(
+			process.cwd(),
+			'models',
+			`model_adam_meanSquaredError`,
+		),
+		@Res() res: any,
+	) {
+		// const modelPath = path.resolve(
+		// 	process.cwd(),
+		// 	'models',
+		// 	`model_adam_meanSquaredError`,
+		// );
+
+		try {
+			const result = await this.predictService.predict(
+				lotteryHistory,
+				modelPath,
+			);
+			return res.status(200).json({
+				statusCode: HttpStatus.OK,
+				data: result,
+			});
+		} catch (err) {
+			throw new HttpException(
+				err.message,
+				HttpStatus.INTERNAL_SERVER_ERROR,
+			);
+		}
+	}
+
+    @Delete('/delete')
+    async handleDeleteModel(@Res() res: any) {
+        const modelName = 'model_adam_meanSquaredError ';
+        try {
+            const result = await this.predictService.cleanModel(modelName);
+            return res.status(HttpStatus.OK).json({
+                statusCode: HttpStatus.OK,
+                message: 'Delete model successfully !'
+            })
+        } catch (err) {
+            throw new HttpException(
+				err.message,
+				HttpStatus.INTERNAL_SERVER_ERROR,
+			);
+        }
+    }
 
 	// @Get('/test')
 	// async test(@Body() data: Array<[]>, @Res() res: any) {
 	// 	const input = [1, 2, 3, 4, 100];
 	// 	const result = await this.predictService.predict(input);
 	// 	return res.status(200).json({
-    //         statusCode: 200,
+	//         statusCode: 200,
 	// 		data: result,
 	// 	});
 	// }
