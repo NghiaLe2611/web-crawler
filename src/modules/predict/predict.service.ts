@@ -1,6 +1,5 @@
 import { Injectable } from '@nestjs/common';
 import * as tf from '@tensorflow/tfjs-node';
-import { spawn } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
 import { MAX_NUMBER, NUMBERS } from 'src/constants';
@@ -164,45 +163,50 @@ export class PredictService {
 
 		let lastEpochLogs;
 
+        /*
+            Single Call to model.fit: Simpler and potentially more optimized by TensorFlow.js, but can be memory-intensive for large datasets and provides less control over the training process.
+            Loop with Batches: More complex but offers better memory efficiency and control over the training process. Ideal for large datasets and when you need custom training routines.
+        */
+
 		// Train the model
-		// await model.fit(trainTensor, labelTensor, {
-		// 	epochs,
-		// 	shuffle: true,
-		// 	callbacks: {
-		// 		onEpochEnd: (epoch, logs) => {
-		// 			lastEpochLogs = logs;
-		// 			// console.log(
-		// 			// 	`Epoch ${epoch + 1}: loss = ${logs.loss}, accuracy = ${logs.acc}`,
-		// 			// );
-		// 		},
-		// 	},
-		// });
+		await model.fit(trainTensor, labelTensor, {
+			epochs,
+			shuffle: true,
+			callbacks: {
+				onEpochEnd: (epoch, logs) => {
+					lastEpochLogs = logs;
+					// console.log(
+					// 	`Epoch ${epoch + 1}: loss = ${logs.loss}, accuracy = ${logs.acc}`,
+					// );
+				},
+			},
+		});
 
 		// Train the model incrementally
-		for (let epoch = 0; epoch < epochs; epoch++) {
-			for (let i = 0; i < trainTensor.shape[0]; i += BATCH_SIZE) {
-				const batchEnd = Math.min(i + BATCH_SIZE, trainTensor.shape[0]);
-				const batchX = trainTensor.slice(
-					[i, 0, 0],
-					[batchEnd - i, -1, -1],
-				);
-				const batchY = labelTensor.slice([i, 0], [batchEnd - i, -1]);
+		// for (let epoch = 0; epoch < epochs; epoch++) {
+		// 	for (let i = 0; i < trainTensor.shape[0]; i += BATCH_SIZE) {
+		// 		const batchEnd = Math.min(i + BATCH_SIZE, trainTensor.shape[0]);
+		// 		const batchX = trainTensor.slice(
+		// 			[i, 0, 0],
+		// 			[batchEnd - i, -1, -1],
+		// 		);
+		// 		const batchY = labelTensor.slice([i, 0], [batchEnd - i, -1]);
 
-				await model.fit(batchX, batchY, {
-					epochs: 1,
-					shuffle: false,
-					callbacks: {
-						onEpochEnd: (epoch, logs) => {
-							lastEpochLogs = logs;
-						},
-					},
-				});
+		// 		await model.fit(batchX, batchY, {
+		// 			epochs: 1,
+		// 			shuffle: false,
+		// 			callbacks: {
+		// 				onEpochEnd: (epoch, logs) => {
+		// 					lastEpochLogs = logs;
+		// 				},
+		// 			},
+		// 		});
 
-				// console.log(
-				// 	`Batch ${i / BATCH_SIZE + 1}: loss = ${history.history.loss[0]}, accuracy = ${history.history.acc[0]}`,
-				// );
-			}
-		}
+		// 		// console.log(
+		// 		// 	`Batch ${i / BATCH_SIZE + 1}: loss = ${history.history.loss[0]}, accuracy = ${history.history.acc[0]}`,
+		// 		// );
+		// 	}
+		// }
 
 		const savePath = await this.saveModel(model, optimizer, loss);
 

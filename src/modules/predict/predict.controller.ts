@@ -16,21 +16,22 @@ import {
 	MAX_NUMBER,
 } from 'src/constants';
 import * as path from 'path';
-import * as tf from '@tensorflow/tfjs-node';
+
+export class TrainModelDto {
+	data: number[][];
+	optimizer = 'adam';
+	loss = 'meanSquaredError';
+	epochs = 100;
+}
 
 @Controller('/analyze')
 export class PredictController {
 	constructor(private readonly predictService: PredictService) {}
 
 	@Post('/train')
-	async handleTrainModal(
-		@Body('data') lotteryHistory: number[][],
-		@Body('optimizer') optimizer = 'adam',
-		@Body('loss') loss = 'meanSquaredError',
-		@Body('epochs') epochs = 100,
-		@Res() res: any,
-	) {
-		if (!lotteryHistory || !lotteryHistory?.length) {
+	async handleTrainModal(@Body() model: TrainModelDto, @Res() res: any) {
+		const { data, optimizer, loss, epochs } = model;
+		if (!data || !data?.length) {
 			return res.status(HttpStatus.BAD_REQUEST).json({
 				statusCode: HttpStatus.BAD_REQUEST,
 				message: 'History not found or is empty',
@@ -39,7 +40,7 @@ export class PredictController {
 
 		try {
 			const result = await this.predictService.trainModel(
-				lotteryHistory,
+				data,
 				optimizer,
 				loss,
 				epochs,
@@ -72,19 +73,14 @@ export class PredictController {
 	@Post('/predict')
 	async handlePredict(
 		@Body('data') lotteryHistory: number[][],
-		@Body('path')
-		modelPath = path.resolve(
-			process.cwd(),
-			'models',
-			`model_adam_meanSquaredError`,
-		),
+		@Body('path') inputPath = 'model_adam_meanSquaredError',
 		@Res() res: any,
 	) {
-		// const modelPath = path.resolve(
-		// 	process.cwd(),
-		// 	'models',
-		// 	`model_adam_meanSquaredError`,
-		// );
+		const modelPath = path.resolve(
+			process.cwd(),
+			'models',
+			inputPath,
+		);
 
 		try {
 			const result = await this.predictService.predict(
@@ -103,22 +99,22 @@ export class PredictController {
 		}
 	}
 
-    @Delete('/delete')
-    async handleDeleteModel(@Res() res: any) {
-        const modelName = 'model_adam_meanSquaredError ';
-        try {
-            const result = await this.predictService.cleanModel(modelName);
-            return res.status(HttpStatus.OK).json({
-                statusCode: HttpStatus.OK,
-                message: 'Delete model successfully !'
-            })
-        } catch (err) {
-            throw new HttpException(
+	@Delete('/delete')
+	async handleDeleteModel(@Res() res: any) {
+		const modelName = 'model_adam_meanSquaredError ';
+		try {
+			const result = await this.predictService.cleanModel(modelName);
+			return res.status(HttpStatus.OK).json({
+				statusCode: HttpStatus.OK,
+				message: 'Delete model successfully !',
+			});
+		} catch (err) {
+			throw new HttpException(
 				err.message,
 				HttpStatus.INTERNAL_SERVER_ERROR,
 			);
-        }
-    }
+		}
+	}
 
 	// @Get('/test')
 	// async test(@Body() data: Array<[]>, @Res() res: any) {
