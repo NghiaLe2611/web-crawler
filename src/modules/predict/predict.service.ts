@@ -163,7 +163,7 @@ export class PredictService {
 
 		let lastEpochLogs;
 
-        /*
+		/*
             Single Call to model.fit: Simpler and potentially more optimized by TensorFlow.js, but can be memory-intensive for large datasets and provides less control over the training process.
             Loop with Batches: More complex but offers better memory efficiency and control over the training process. Ideal for large datasets and when you need custom training routines.
         */
@@ -213,6 +213,97 @@ export class PredictService {
 		return { model, modelPath: savePath, lastEpochLogs };
 	}
 
+	async trainModelIncrementally(
+		lotteryHistory,
+		optimizer: string,
+		loss: string,
+		epochs: number,
+		maxNumber = MAX_NUMBER['Power655'],
+		numberOfFeatures = NUMBERS['Power655'],
+	) {
+		const numberOfRows = lotteryHistory.length;
+
+		if (numberOfRows <= WINDOW_LENGTH) {
+			throw new Error(
+				`Not enough data points to create training examples. Need more than ${WINDOW_LENGTH} data points.`,
+			);
+		}
+
+		// Normalize the data
+		const scaledLotteryHistory = lotteryHistory.map((row) =>
+			row.map((num) => num / maxNumber),
+		);
+
+		// Prepare train and label data
+		const train = [];
+		const label = [];
+		for (let i = 0; i < numberOfRows - WINDOW_LENGTH; i++) {
+			const window = scaledLotteryHistory.slice(i, i + WINDOW_LENGTH);
+			train.push(window);
+			label.push(scaledLotteryHistory[i + WINDOW_LENGTH]);
+		}
+
+		const trainTensor = tf.tensor3d(train);
+		const labelTensor = tf.tensor2d(label);
+
+		let model;
+		const modelPath = this.getModelPath(optimizer, loss);
+
+		try {
+			// Try to load existing model
+			model = await this.loadModel(modelPath);
+			console.log(
+				'Existing model loaded. Performing incremental learning.',
+			);
+
+			// Fine-tuning: Freeze all layers except the last two
+			for (let i = 0; i < model.layers.length - 2; i++) {
+				model.layers[i].trainable = false;
+			}
+
+			// Recompile with a lower learning rate for fine-tuning
+			const learningRate = 0.001;
+			const newOptimizer = tf.train.adam(learningRate);
+			model.compile({
+				optimizer: newOptimizer,
+				loss: loss,
+				metrics: ['accuracy'],
+			});
+		} catch (error) {
+			console.log('No existing model found. Creating a new model.');
+			model = await this.createNewModel(
+				optimizer,
+				loss,
+				WINDOW_LENGTH,
+				numberOfFeatures,
+			);
+		}
+
+		let lastEpochLogs;
+
+		// Train the model
+		await model.fit(trainTensor, labelTensor, {
+			epochs,
+			shuffle: true,
+			callbacks: {
+				onEpochEnd: (epoch, logs) => {
+					lastEpochLogs = logs;
+					console.log(
+						`Epoch ${epoch + 1}: loss = ${logs.loss}, accuracy = ${logs.acc}`,
+					);
+				},
+			},
+		});
+
+		const savePath = await this.saveModel(model, optimizer, loss);
+
+		// Clean up tensors
+		// trainTensor.dispose();
+		// labelTensor.dispose();
+
+		return { model, modelPath: savePath, lastEpochLogs };
+	}
+
 	async predict(history: number[][], modelPath: string) {
 		const model = await this.loadModel(modelPath);
 
@@ -251,9 +342,13 @@ export class PredictService {
 
 	async cleanModel(modelName: string) {
 		// const folderPath = path.resolve(process.cwd(), 'models', modelName);
-        const folderPath = path.resolve(process.cwd(), 'models', modelName.trim());
+		const folderPath = path.resolve(
+			process.cwd(),
+			'models',
+			modelName.trim(),
+		);
 
-		try {   
+		try {
 			if (fs.existsSync(folderPath)) {
 				fs.rmSync(folderPath, { recursive: true, force: true });
 				console.log(`Folder ${modelName} deleted successfully.`);
