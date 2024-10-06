@@ -35,6 +35,26 @@ export class PredictService {
 		return modelPath;
 	}
 
+	private getAccuracyPath(modelPath: string): string {
+		return path.join(modelPath, 'accuracy.json');
+	}
+
+	async saveAccuracy(modelPath: string, accuracy: number): Promise<void> {
+		const accuracyPath = this.getAccuracyPath(modelPath);
+		const accuracyData = JSON.stringify({ accuracy }, null, 2);
+		fs.writeFileSync(accuracyPath, accuracyData);
+	}
+
+	async loadAccuracy(modelPath: string): Promise<number | null> {
+		const accuracyPath = this.getAccuracyPath(modelPath);
+		if (fs.existsSync(accuracyPath)) {
+			const accuracyData = fs.readFileSync(accuracyPath, 'utf-8');
+			const { accuracy } = JSON.parse(accuracyData);
+			return accuracy;
+		}
+		return null;
+	}
+
 	async createNewModel(
 		optimizer: string,
 		loss: string,
@@ -209,7 +229,9 @@ export class PredictService {
 		// }
 
 		const savePath = await this.saveModel(model, optimizer, loss);
-
+		if (lastEpochLogs) {
+			await this.saveAccuracy(savePath, lastEpochLogs.acc);
+		}
 		return { model, modelPath: savePath, lastEpochLogs };
 	}
 
@@ -306,6 +328,7 @@ export class PredictService {
 
 	async predict(history: number[][], modelPath: string) {
 		const model = await this.loadModel(modelPath);
+		const accuracy = await this.loadAccuracy(modelPath);
 
 		const toPredict = history.slice(0, 2);
 		// Normalize the prediction input
@@ -335,9 +358,12 @@ export class PredictService {
             If you normalized the data by dividing each number by a maximum value (e.g., 55), you need to multiply the normalized values by the maximum value to revert them to the original scale.
             After reversing the normalization, round the values to the nearest integers if your original data consists of discrete numbers (like lottery numbers).
 		*/
-		return predictionOutput.map((value) =>
-			Math.round(value * MAX_NUMBER.Power655),
-		);
+		return {
+			data: predictionOutput.map((value) =>
+				Math.round(value * MAX_NUMBER.Power655),
+			),
+			accuracy,
+		};
 	}
 
 	async cleanModel(modelName: string) {

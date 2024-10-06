@@ -76,20 +76,24 @@ export class PredictController {
 		@Body('path') inputPath = 'model_adam_meanSquaredError',
 		@Res() res: any,
 	) {
-		const modelPath = path.resolve(
-			process.cwd(),
-			'models',
-			inputPath,
-		);
+		const modelPath = path.resolve(process.cwd(), 'models', inputPath);
 
 		try {
 			const result = await this.predictService.predict(
 				lotteryHistory,
 				modelPath,
 			);
-			return res.status(200).json({
+			if (result) {
+				return res.status(200).json({
+					statusCode: HttpStatus.OK,
+					data: result.data,
+					accuracy: result.accuracy,
+				});
+			}
+
+            return res.status(200).json({
 				statusCode: HttpStatus.OK,
-				data: result,
+				data: [],
 			});
 		} catch (err) {
 			throw new HttpException(
