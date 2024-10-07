@@ -3,6 +3,7 @@ import * as tf from '@tensorflow/tfjs-node';
 import * as fs from 'fs';
 import * as path from 'path';
 import { MAX_NUMBER, NUMBERS } from 'src/constants';
+import { LotteryType } from 'src/types';
 
 // Window Size (w): Determines the number of previous data points used as input features to predict the next data point.
 const WINDOW_LENGTH = 2;
@@ -21,7 +22,11 @@ const BATCH_SIZE = 32;
 
 @Injectable()
 export class PredictService {
-	private getModelPath(optimizer: string, loss: string): string {
+	private getModelPath(
+		lotteryType: LotteryType,
+		optimizer: string,
+		loss: string,
+	): string {
 		// const modelPath = path.resolve(
 		// 	process.cwd(),
 		// 	'models',
@@ -29,7 +34,7 @@ export class PredictService {
 		// );
 
 		// const modelPath = path.resolve(__dirname, `models/model_${optimizer}_${loss}`);
-		const modelDir = path.resolve(process.cwd(), 'models');
+		const modelDir = path.resolve(process.cwd(), `models/${lotteryType}`);
 		const modelPath = path.resolve(modelDir, `model_${optimizer}_${loss}`);
 
 		return modelPath;
@@ -84,8 +89,13 @@ export class PredictService {
 		return model;
 	}
 
-	async saveModel(model, optimizer: string, loss: string) {
-		const modelPath = this.getModelPath(optimizer, loss);
+	async saveModel(
+		model,
+		lotteryType: LotteryType,
+		optimizer: string,
+		loss: string,
+	) {
+		const modelPath = this.getModelPath(lotteryType, optimizer, loss);
 
 		// Ensure the models directory exists, create it if not
 		if (!fs.existsSync(path.dirname(modelPath))) {
@@ -108,12 +118,13 @@ export class PredictService {
 	}
 
 	async loadOrCreateModel(
+		lotteryType: LotteryType,
 		optimizer: string,
 		loss: string,
 		windowLength: number,
 		numberOfFeatures: number,
 	) {
-		const modelPath = this.getModelPath(optimizer, loss);
+		const modelPath = this.getModelPath(lotteryType, optimizer, loss);
 		let model;
 
 		if (fs.existsSync(modelPath)) {
@@ -139,14 +150,15 @@ export class PredictService {
 	}
 
 	async trainModel(
-		lotteryHistory,
+		lotteryType: LotteryType = 'Power655',
+		lotteryHistory: Record<string, any>[],
 		optimizer: string,
 		loss: string,
 		epochs: number,
-		maxNumber = MAX_NUMBER['Power655'],
-		numberOfFeatures = NUMBERS['Power655'],
 	) {
 		const numberOfRows = lotteryHistory.length;
+		const maxNumber = MAX_NUMBER[lotteryType];
+		const numberOfFeatures = NUMBERS[lotteryType];
 
 		// Ensure there are enough data points
 		if (numberOfRows <= WINDOW_LENGTH) {
@@ -175,6 +187,7 @@ export class PredictService {
 		const labelTensor = tf.tensor2d(label);
 
 		const model = await this.loadOrCreateModel(
+			lotteryType,
 			optimizer,
 			loss,
 			WINDOW_LENGTH,
@@ -228,7 +241,12 @@ export class PredictService {
 		// 	}
 		// }
 
-		const savePath = await this.saveModel(model, optimizer, loss);
+		const savePath = await this.saveModel(
+			model,
+			lotteryType,
+			optimizer,
+			loss,
+		);
 		if (lastEpochLogs) {
 			await this.saveAccuracy(savePath, lastEpochLogs.acc);
 		}
@@ -236,14 +254,15 @@ export class PredictService {
 	}
 
 	async trainModelIncrementally(
-		lotteryHistory,
+		lotteryType: LotteryType = 'Power655',
+		lotteryHistory: Record<string, any>[],
 		optimizer: string,
 		loss: string,
 		epochs: number,
-		maxNumber = MAX_NUMBER['Power655'],
-		numberOfFeatures = NUMBERS['Power655'],
 	) {
 		const numberOfRows = lotteryHistory.length;
+		const maxNumber = MAX_NUMBER[lotteryType];
+		const numberOfFeatures = NUMBERS[lotteryType];
 
 		if (numberOfRows <= WINDOW_LENGTH) {
 			throw new Error(
@@ -269,7 +288,7 @@ export class PredictService {
 		const labelTensor = tf.tensor2d(label);
 
 		let model;
-		const modelPath = this.getModelPath(optimizer, loss);
+		const modelPath = this.getModelPath(lotteryType, optimizer, loss);
 
 		try {
 			// Try to load existing model
@@ -310,30 +329,42 @@ export class PredictService {
 			callbacks: {
 				onEpochEnd: (epoch, logs) => {
 					lastEpochLogs = logs;
-					console.log(
-						`Epoch ${epoch + 1}: loss = ${logs.loss}, accuracy = ${logs.acc}`,
-					);
+					// console.log(
+					// 	`Epoch ${epoch + 1}: loss = ${logs.loss}, accuracy = ${logs.acc}`,
+					// );
 				},
 			},
 		});
 
-		const savePath = await this.saveModel(model, optimizer, loss);
+		const savePath = await this.saveModel(
+			model,
+			lotteryType,
+			optimizer,
+			loss,
+		);
 
 		// Clean up tensors
 		// trainTensor.dispose();
 		// labelTensor.dispose();
 
+		if (lastEpochLogs) {
+			await this.saveAccuracy(savePath, lastEpochLogs.acc);
+		}
 		return { model, modelPath: savePath, lastEpochLogs };
 	}
 
-	async predict(history: number[][], modelPath: string) {
+	async predict(
+		lotteryType: LotteryType = 'Power655',
+		history: number[][],
+		modelPath: string,
+	) {
 		const model = await this.loadModel(modelPath);
 		const accuracy = await this.loadAccuracy(modelPath);
 
 		const toPredict = history.slice(0, 2);
 		// Normalize the prediction input
 		const scaledToPredict = toPredict.map((row) =>
-			row.map((value) => value / MAX_NUMBER.Power655),
+			row.map((value) => value / MAX_NUMBER[lotteryType]),
 		);
 		const predictionTensor = tf.tensor3d([scaledToPredict]);
 		const scaledPredictionOutput = model.predict(predictionTensor);
@@ -360,7 +391,7 @@ export class PredictService {
 		*/
 		return {
 			data: predictionOutput.map((value) =>
-				Math.round(value * MAX_NUMBER.Power655),
+				Math.round(value * MAX_NUMBER[lotteryType]),
 			),
 			accuracy,
 		};
@@ -492,9 +523,9 @@ export class PredictService {
 /*
 async trainModel(
     lotteryHistory,
-    optimizer = defaultPredictParams.optimizer,
-    loss = defaultPredictParams.loss,
-    epochs = defaultPredictParams.epochs,
+    optimizer = DEFAULT_PREDICT_PARAMS.optimizer,
+    loss = DEFAULT_PREDICT_PARAMS.loss,
+    epochs = DEFAULT_PREDICT_PARAMS.epochs,
 ) {
     // Prepare feature and target data
     const features = [];

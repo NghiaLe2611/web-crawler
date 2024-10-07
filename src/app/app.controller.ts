@@ -7,7 +7,7 @@ export class AppController {
 	constructor(private readonly appService: AppService) {}
 
 	@Get()
-	async getHello(@Req() req: Request, @Res() res: Response) {
+	async getStatus(@Req() req: Request, @Res() res: Response) {
 		// Inject Request object
 		try {
 			// const data = await this.appService.getHello();
@@ -26,12 +26,4 @@ export class AppController {
 		}
 	}
 
-	@Get('test')
-	create(@Res() res: Response) {
-        return res.send('test');
-	}
-
-	// getHello(): object {
-	// 	return this.appService.getHello();
-	// }
 }

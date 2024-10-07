@@ -11,17 +11,25 @@ import {
 } from '@nestjs/common';
 import { PredictService } from './predict.service';
 import {
-	commonErrorMsg,
-	defaultPredictParams,
+	COMMON_ERR_MESSAGE,
+	DEFAULT_PREDICT_PARAMS,
 	MAX_NUMBER,
 } from 'src/constants';
 import * as path from 'path';
+import { LotteryType } from 'src/types';
 
-export class TrainModelDto {
+class TrainModelDto {
 	data: number[][];
 	optimizer = 'adam';
 	loss = 'meanSquaredError';
 	epochs = 100;
+	lotteryType: LotteryType;
+}
+
+class PredictDataDto {
+	lotteryType: LotteryType;
+	lotteryHistory: number[][];
+	inputPath: string;
 }
 
 @Controller('/analyze')
@@ -30,7 +38,7 @@ export class PredictController {
 
 	@Post('/train')
 	async handleTrainModal(@Body() model: TrainModelDto, @Res() res: any) {
-		const { data, optimizer, loss, epochs } = model;
+		const { data, optimizer, loss, epochs, lotteryType } = model;
 		if (!data || !data?.length) {
 			return res.status(HttpStatus.BAD_REQUEST).json({
 				statusCode: HttpStatus.BAD_REQUEST,
@@ -39,7 +47,8 @@ export class PredictController {
 		}
 
 		try {
-			const result = await this.predictService.trainModel(
+			const result = await this.predictService.trainModelIncrementally(
+				lotteryType,
 				data,
 				optimizer,
 				loss,
@@ -49,10 +58,10 @@ export class PredictController {
 			if (result && result.model) {
 				return res.status(HttpStatus.OK).json({
 					statusCode: HttpStatus.OK,
-					message: 'Train data sucessfully',
-					optimizer: optimizer || defaultPredictParams.optimizer,
-					losses: loss || defaultPredictParams.loss,
-					epochs: epochs || defaultPredictParams.epochs,
+					message: 'Train model sucessfully',
+					optimizer: optimizer || DEFAULT_PREDICT_PARAMS.optimizer,
+					losses: loss || DEFAULT_PREDICT_PARAMS.loss,
+					epochs: epochs || DEFAULT_PREDICT_PARAMS.epochs,
 					loss: result.lastEpochLogs?.loss || null,
 					acc: result.lastEpochLogs?.acc || null,
 				});
@@ -60,7 +69,7 @@ export class PredictController {
 
 			return res.status(HttpStatus.BAD_REQUEST).json({
 				statusCode: HttpStatus.BAD_REQUEST,
-				message: commonErrorMsg,
+				message: COMMON_ERR_MESSAGE,
 			});
 		} catch (err) {
 			throw new HttpException(
@@ -72,14 +81,23 @@ export class PredictController {
 
 	@Post('/predict')
 	async handlePredict(
-		@Body('data') lotteryHistory: number[][],
-		@Body('path') inputPath = 'model_adam_meanSquaredError',
+		@Body() predictData: PredictDataDto,
+		// @Body('lotteryType') lotteryType: LotteryType,
+		// @Body('data') lotteryHistory: number[][],
+		// @Body('path') inputPath = 'model_adam_meanSquaredError',
 		@Res() res: any,
 	) {
-		const modelPath = path.resolve(process.cwd(), 'models', inputPath);
+		const { lotteryHistory, lotteryType, inputPath } = predictData;
+		const modelPath = path.resolve(
+			process.cwd(),
+			'models',
+			lotteryType,
+			inputPath,
+		);
 
 		try {
 			const result = await this.predictService.predict(
+				lotteryType,
 				lotteryHistory,
 				modelPath,
 			);
@@ -91,7 +109,7 @@ export class PredictController {
 				});
 			}
 
-            return res.status(200).json({
+			return res.status(200).json({
 				statusCode: HttpStatus.OK,
 				data: [],
 			});
@@ -104,8 +122,10 @@ export class PredictController {
 	}
 
 	@Delete('/delete')
-	async handleDeleteModel(@Res() res: any) {
-		const modelName = 'model_adam_meanSquaredError ';
+	async handleDeleteModel(
+		@Body() modelName: string,
+		@Res() res: any,
+	) {
 		try {
 			const result = await this.predictService.cleanModel(modelName);
 			return res.status(HttpStatus.OK).json({

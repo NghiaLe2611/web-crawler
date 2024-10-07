@@ -2,9 +2,9 @@ import { Injectable } from '@nestjs/common';
 
 @Injectable()
 export class AppService {
-	getHello() {
+	getStatus() {
 		return {
-            message: 'OK'
-        };
+			message: 'OK',
+		};
 	}
 }

@@ -1,14 +1,14 @@
 import { Injectable } from '@nestjs/common';
 import puppeteer from 'puppeteer';
 import NodeCache from 'node-cache';
-import { LotteryType } from 'src/types';
+import { LotteryCrawlUrl } from 'src/types';
 
 const cacheCrawlData = new NodeCache({ stdTTL: 4 * 60 * 60 }); // 4h
 
 @Injectable()
 export class PuppeteerService {
-	async scrapeData(type: LotteryType) {
-		const url = LotteryType[type];
+	async scrapeData(type: LotteryCrawlUrl) {
+		const url = LotteryCrawlUrl[type];
 
 		if (!url) {
 			return null;
@@ -22,7 +22,7 @@ export class PuppeteerService {
 
 		try {
 			const browser = await puppeteer.launch({
-				ignoreHTTPSErrors: true
+				ignoreHTTPSErrors: true,
 			});
 			const page = await browser.newPage();
 			// page.setViewport({ width: 1280, height: 720 });
