@@ -1,6 +1,7 @@
 import { Controller, Get, HttpStatus, Post, Req, Res } from '@nestjs/common';
 import { AppService } from './app.service';
 import { Request, Response } from 'express';
+import { MessagePattern } from '@nestjs/microservices';
 
 @Controller()
 export class AppController {
@@ -12,18 +13,23 @@ export class AppController {
 		try {
 			// const data = await this.appService.getHello();
 			// Access request properties (if needed)
-            return res.json({
-                statusCode: HttpStatus.OK,
-                message: 'OK',
+			return res.json({
+				statusCode: HttpStatus.OK,
+				message: 'OK',
 				env: process.env.NODE_ENV || 'development',
-				user: process.env.TEST_USER || null
-            });
+				user: process.env.TEST_USER || null,
+			});
 		} catch (err) {
-            return res.json({
-                statusCode: HttpStatus.BAD_REQUEST,
-                message: 'error'
-            });
+			return res.json({
+				statusCode: HttpStatus.BAD_REQUEST,
+				message: 'error',
+			});
 		}
 	}
 
+	@MessagePattern({ cmd: 'get_data' })
+	getData(data: any) {
+		console.log('Retrieving:', data);
+		return { status: 'ok' };
+	}
 }
