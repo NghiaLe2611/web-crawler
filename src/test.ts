@@ -64,7 +64,7 @@ const fs = require('fs');
 		// console.log('Data has been written to output.json file.');
 
 		// await browser.close();
-	} catch (err) {
-		console.error('Error:', err);
+	} catch (error) {
+		console.error('Error:', error);
 	}
 })();

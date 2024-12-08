@@ -1,11 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
-import { PuppeteerService } from 'src/modules/puppeteer/puppeteer.service';
+import { CrawlService } from 'src/modules/crawl/crawl.service';
 
 // giây phút giờ ngày tháng tuần
 @Injectable()
 export class CronService {
-	constructor(private readonly puppeteerService: PuppeteerService) {}
+	constructor(private readonly puppeteerService: CrawlService) {}
 	// private readonly logger = new Logger(CronService.name);
 
 	@Cron('* * * * * *')

@@ -71,9 +71,9 @@ export class PredictController {
 				statusCode: HttpStatus.BAD_REQUEST,
 				message: COMMON_ERR_MESSAGE,
 			});
-		} catch (err) {
+		} catch (error) {
 			throw new HttpException(
-				err.message,
+				error.message,
 				HttpStatus.INTERNAL_SERVER_ERROR,
 			);
 		}
@@ -113,28 +113,25 @@ export class PredictController {
 				statusCode: HttpStatus.OK,
 				data: [],
 			});
-		} catch (err) {
+		} catch (error) {
 			throw new HttpException(
-				err.message,
+				error.message,
 				HttpStatus.INTERNAL_SERVER_ERROR,
 			);
 		}
 	}
 
 	@Delete('/delete')
-	async handleDeleteModel(
-		@Body() modelName: string,
-		@Res() res: any,
-	) {
+	async handleDeleteModel(@Body() modelName: string, @Res() res: any) {
 		try {
 			const result = await this.predictService.cleanModel(modelName);
 			return res.status(HttpStatus.OK).json({
 				statusCode: HttpStatus.OK,
 				message: 'Delete model successfully !',
 			});
-		} catch (err) {
+		} catch (error) {
 			throw new HttpException(
-				err.message,
+				error.message,
 				HttpStatus.INTERNAL_SERVER_ERROR,
 			);
 		}

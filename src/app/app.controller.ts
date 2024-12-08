@@ -12,18 +12,17 @@ export class AppController {
 		try {
 			// const data = await this.appService.getHello();
 			// Access request properties (if needed)
-            return res.json({
-                statusCode: HttpStatus.OK,
-                message: 'OK',
+			return res.json({
+				statusCode: HttpStatus.OK,
+				message: 'OK',
 				env: process.env.NODE_ENV || 'development',
-				user: process.env.TEST_USER || null
-            });
-		} catch (err) {
-            return res.json({
-                statusCode: HttpStatus.BAD_REQUEST,
-                message: 'error'
-            });
+				user: process.env.TEST_USER || null,
+			});
+		} catch (error) {
+			return res.json({
+				statusCode: HttpStatus.BAD_REQUEST,
+				message: 'error',
+			});
 		}
 	}
-
 }
