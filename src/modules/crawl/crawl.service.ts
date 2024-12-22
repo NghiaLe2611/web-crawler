@@ -1,12 +1,11 @@
-import { Injectable } from '@nestjs/common';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { Inject, Injectable, OnModuleInit } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
-import NodeCache from 'node-cache';
-import puppeteer from 'puppeteer';
-import { LotteryCrawlUrl, LotteryType } from 'src/types';
+import { Cache } from 'cache-manager';
 import { promises as fs } from 'fs';
 import { join } from 'path';
-
-// const cacheCrawlData = new NodeCache({ stdTTL: 4 * 60 * 60 }); // 4h
+import puppeteer from 'puppeteer';
+import { LotteryCrawlUrl, LotteryType } from 'src/types';
 
 interface LotteryData {
 	type: LotteryType;
@@ -14,22 +13,24 @@ interface LotteryData {
 }
 
 @Injectable()
-export class CrawlService {
-	// private cacheCrawlData: NodeCache;
-	// private globalLotteryData: Record<LotteryCrawlUrl, any> = {} as any;
+export class CrawlService implements OnModuleInit {
 	private dataDirectory = join(process.cwd(), 'public', 'data');
+	private readonly CACHE_TTL = 24 * 60 * 60; // 24h
 
-	// constructor() {
-	// this.cacheCrawlData = new NodeCache({
-	// 	stdTTL: 0, // Không giới hạn TTL
-	// 	checkperiod: 0,
-	// });
-	// }
+	constructor(
+        @Inject(CACHE_MANAGER) private cacheManager: Cache
+    ) {}
 
-	// Cron job mega 6/45
-	// @Cron('0 19 * * 1,3,5')
-	@Cron('*/60 * * * * *')
-	async handleCrawlCronMega645() {
+    // Get latest data when init
+	async onModuleInit() {
+        await this.crawlAndCacheData('Mega645');
+        await this.crawlAndCacheData('Power655');
+	}
+
+	// Cron job mega 6/45 thứ 2 4 6 19h
+	@Cron('0 19 * * 1,3,5')
+	// @Cron('*/60 * * * * *')
+	async scheduleCrawlMega645() {
 		const cachedData = await this.getLotteryData(`Mega645`);
 		console.log('has cached data Mega645');
 
@@ -40,10 +41,10 @@ export class CrawlService {
 		await this.crawlAndCacheData('Mega645');
 	}
 
-	// Cron job power 6/55
-	// @Cron('0 19 * * 2,4,6')
-	@Cron('*/60 * * * * *')
-	async handleCrawlCronPower655() {
+	// Cron job power 6/55 thứ 3 5 7 19h
+	@Cron('0 19 * * 2,4,6')
+	// @Cron('*/60 * * * * *')
+	async scheduleCrawlPower655() {
 		const cachedData = await this.getLotteryData(`Power655`);
 		console.log('has cached data Power655');
 		if (cachedData) return;
@@ -203,9 +204,6 @@ export class CrawlService {
 				data,
 			};
 
-			// this.globalLotteryData[type] = lotteryData;
-			// this.cacheCrawlData.set(`lottery_${type}`, lotteryData);
-
 			// Check folder
 			await fs.mkdir(this.dataDirectory, { recursive: true });
 
@@ -222,6 +220,13 @@ export class CrawlService {
 				'utf-8',
 			);
 
+			// Update cache
+			// await this.cacheManager.set(
+			// 	`lottery_${type}`,
+			// 	lotteryData,
+			// 	this.CACHE_TTL,
+			// );
+
 			console.log(`Save cache for lottery_${type}`);
 		} catch (error) {
 			// console.log(`Error crawling ${type}:`, error);
@@ -230,14 +235,6 @@ export class CrawlService {
 	}
 
 	public async getLotteryData(type: LotteryType) {
-		// const cachedData = this.cacheCrawlData.get(`lottery_${type}`) as any;
-
-		// // Check cache
-		// if (cachedData) {
-		// 	return cachedData;
-		// }
-
-		// return null;
 		const filePath = join(this.dataDirectory, `${type}.json`);
 
 		try {

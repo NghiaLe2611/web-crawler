@@ -1,19 +1,12 @@
 import {
-	Body,
-	Controller,
-	Delete,
-	Get,
-	HttpException,
-	HttpStatus,
-	Param,
-	Patch,
-	Post,
-	Query,
-	UseFilters,
+    Controller,
+    Get,
+    HttpException,
+    HttpStatus,
+    Query
 } from '@nestjs/common';
+import { LotteryType } from 'src/types';
 import { CrawlService } from './crawl.service';
-import { ScrapeResponse } from './crawl.interface';
-import { LotteryCrawlUrl, LotteryType } from 'src/types';
 
 @Controller('crawl')
 export class CrawlController {
