@@ -71,3 +71,7 @@ Nest is an MIT-licensed open source project. It can grow thanks to the sponsors 
 ## License
 
 Nest is [MIT licensed](LICENSE).
+
+# Nodejs 17.9.1
+# npm install --global --production windows-build-tools
+# npm install @tensorflow/tfjs-node --build-from-source
