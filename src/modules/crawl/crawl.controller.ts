@@ -34,7 +34,9 @@ export class CrawlController {
 	async getData(@Query('type') type: LotteryType) {
 		try {
 			const res = await this.crawlService.getLotteryData(type);
-			return { data: res?.data || [], statusCode: HttpStatus.OK };
+            // console.log(111, res);
+            return { data: res, statusCode: HttpStatus.OK };
+			// return { data: res?.data || [], statusCode: HttpStatus.OK };
 		} catch (error) {
 			throw new HttpException(
 				'Scraping failed: ' + error.message,

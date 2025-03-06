@@ -17,12 +17,14 @@ export class CrawlService implements OnModuleInit {
 	private dataDirectory = join(process.cwd(), 'public', 'data');
 	private readonly CACHE_TTL = 24 * 60 * 60; // 24h
 
-	constructor(@Inject(CACHE_MANAGER) private cacheManager: Cache) {}
+	constructor(
+        @Inject(CACHE_MANAGER) private cacheManager: Cache
+    ) {}
 
-	// Get latest data when init
+    // Get latest data when init
 	async onModuleInit() {
-		// await this.crawlAndCacheData('Mega645');
-		// await this.crawlAndCacheData('Power655');
+        await this.crawlAndCacheData('Mega645');
+        await this.crawlAndCacheData('Power655');
 	}
 
 	// Cron job mega 6/45 thứ 2 4 6 19h
@@ -147,9 +149,6 @@ export class CrawlService implements OnModuleInit {
 			// Extract data from the website
 			const result = await page.evaluate(() => {
 				const data = [];
-				const jackpot1Data = [];
-				const jackpot2Data = [];
-
 				// Get all table rows with the class "table-mini-result"
 				const tableRows = document.querySelectorAll(
 					'.table-mini-result tr',
@@ -164,51 +163,17 @@ export class CrawlService implements OnModuleInit {
 
 					// Find all spans with the class "home-mini-whiteball" within the current table row
 					const number = row.querySelectorAll('.home-mini-whiteball');
+
 					// Iterate over each span and push its text content to the rowNumbers array
 					number.forEach(function (span) {
 						rowNumbers.push(span.textContent.trim());
 					});
-
-					// Find jackpot 1 + jackpot 2
-					const jackpot1 = row.querySelector('td:nth-child(3)');
-					const jackpot1Content = jackpot1
-						? jackpot1.querySelector('span:first-child').textContent
-						: null;
-					const jackpot1Span = jackpot1
-						? jackpot1.querySelector('span')
-						: null;
-					console.log(123, jackpot1Span);
-					const isJackpot1Lottery = jackpot1Span
-						? (jackpot1Span as HTMLElement).style.color ===
-							'rgb(255, 0, 0)'
-						: false;
-
-					const jackpot2 = row.querySelector('td:nth-child(4)');
-					const jackpot2Content = jackpot2
-						? jackpot2.querySelector('span:first-child').textContent
-						: null;
-					const jackpot2Span = jackpot2
-						? jackpot2.querySelector('span')
-						: null;
-					const isJackpot2Lottery = jackpot2Span
-						? (jackpot2Span as HTMLElement).style.color ===
-							'rgb(255, 0, 0)'
-						: false;
-					// getAttribute('style') // color:#F00
 
 					// Add the array of numbers from the current row to the main array
 					if (rowNumbers.length) {
 						data.push({
 							date: dateCell.textContent,
 							numbers: rowNumbers,
-							jackpot1: {
-								value: jackpot1Content,
-								isLottery: isJackpot1Lottery,
-							},
-							jackpot2: {
-								value: jackpot2Content,
-								isLottery: isJackpot2Lottery,
-							},
 						});
 					}
 				});
@@ -270,29 +235,22 @@ export class CrawlService implements OnModuleInit {
 	}
 
 	public async getLotteryData(type: LotteryType) {
-		// const filePath = join(this.dataDirectory, `${type}.json`);
-
-		// try {
-		// 	const fileContent = await fs.readFile(filePath, 'utf-8');
-		// 	const data = JSON.parse(fileContent);
-		// 	if (data?.data?.length > 0) {
-		// 		return data as LotteryData;
-		// 	}
-
-		// 	return null;
-		// } catch (error) {
-		// 	if (error.code === 'ENOENT') {
-		// 		// File does not exist
-		// 		return null;
-		// 	}
-		// 	throw new Error(`Error reading data for ${type}: ${error.message}`);
-		// }
+		const filePath = join(this.dataDirectory, `${type}.json`);
 
 		try {
-			const data = await this.scrapeData(type);
-			return data;
+			const fileContent = await fs.readFile(filePath, 'utf-8');
+			const data = JSON.parse(fileContent);
+			if (data?.data?.length > 0) {
+				return data as LotteryData;
+			}
+
+			return null;
 		} catch (error) {
-			throw new Error(error);
+			if (error.code === 'ENOENT') {
+				// File does not exist
+				return null;
+			}
+			throw new Error(`Error reading data for ${type}: ${error.message}`);
 		}
 	}
 }
