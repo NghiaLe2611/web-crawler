@@ -60,3 +60,4 @@ venv
 .venv
 
 models
+/public/data/*.json

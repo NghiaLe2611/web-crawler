@@ -1,0 +1,22 @@
+version: '3.8'
+
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    restart: always
+    ports:
+      - '6379:6379'
+    environment:
+      - REDIS_USERNAME=${REDIS_USERNAME}
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+    env_file:
+      - .env
+    volumes:
+      - ./redis-init.sh:/usr/local/bin/redis-init.sh
+    command: ["sh", "-c", "chmod +x /usr/local/bin/redis-init.sh && /usr/local/bin/redis-init.sh"]
+
+
+# With password
+# redis-server
+# --requirepass ${REDIS_PASSWORD}
