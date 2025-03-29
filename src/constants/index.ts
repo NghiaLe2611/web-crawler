@@ -5,7 +5,7 @@ export const MAX_NUMBER = {
 
 export const NUMBERS = {
 	Mega645: 6,
-	Power655: 7,
+	Power655: 6,
 };
 
 export const DEFAULT_PREDICT_PARAMS = {

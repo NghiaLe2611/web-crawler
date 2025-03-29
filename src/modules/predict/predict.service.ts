@@ -7,7 +7,7 @@ import { LotteryType } from 'src/types';
 
 // Window Size (w): Determines the number of previous data points used as input features to predict the next data point.
 const WINDOW_LENGTH = 2;
-const BATCH_SIZE = 32;
+// const BATCH_SIZE = 32;
 
 // function shuffleArray(array) {
 // 	for (let i = array.length - 1; i > 0; i--) {
@@ -271,9 +271,21 @@ export class PredictService {
 		}
 
 		// Normalize the data
-		const scaledLotteryHistory = lotteryHistory.map((row) =>
-			row.map((num) => num / maxNumber),
-		);
+		// const scaledLotteryHistory = lotteryHistory.map((row) =>
+		// 	row.map((num) => num / maxNumber),
+		// );
+		const scaledLotteryHistory = lotteryHistory.map((row) => {
+			// Ensure each row has exactly 6 numbers by slicing or padding if necessary
+			const numbers = Array.isArray(row)
+				? row.slice(0, 6)
+				: Object.values(row).slice(0, 6);
+			if (numbers.length !== 6) {
+				throw new Error(
+					`Each lottery draw must contain exactly 6 numbers, got ${numbers.length}`,
+				);
+			}
+			return numbers.map((num) => num / maxNumber);
+		});
 
 		// Prepare train and label data
 		const train = [];
@@ -284,8 +296,17 @@ export class PredictService {
 			label.push(scaledLotteryHistory[i + WINDOW_LENGTH]);
 		}
 
-		const trainTensor = tf.tensor3d(train);
-		const labelTensor = tf.tensor2d(label);
+		// const trainTensor = tf.tensor3d(train);
+		// const labelTensor = tf.tensor2d(label);
+		const trainTensor = tf.tensor3d(train, [
+			train.length,
+			WINDOW_LENGTH,
+			numberOfFeatures,
+		]);
+		const labelTensor = tf.tensor2d(label, [
+			label.length,
+			numberOfFeatures,
+		]);
 
 		let model;
 		const modelPath = this.getModelPath(lotteryType, optimizer, loss);
@@ -363,9 +384,18 @@ export class PredictService {
 
 		const toPredict = history.slice(0, 2);
 		// Normalize the prediction input
-		const scaledToPredict = toPredict.map((row) =>
-			row.map((value) => value / MAX_NUMBER[lotteryType]),
-		);
+		// const scaledToPredict = toPredict.map((row) =>
+		// 	row.map((value) => value / MAX_NUMBER[lotteryType]),
+		// );
+        const scaledToPredict = toPredict.map((row) => {
+			const numbers = row.slice(0, 6);
+			if (numbers.length !== 6) {
+				throw new Error(
+					`Each prediction input must contain exactly 6 numbers, got ${numbers.length}`,
+				);
+			}
+			return numbers.map((value) => value / MAX_NUMBER[lotteryType]);
+		});
 		const predictionTensor = tf.tensor3d([scaledToPredict]);
 		const scaledPredictionOutput = model.predict(predictionTensor);
 		// const predictionOutput = scaledPredictionOutput.arraySync()[0];

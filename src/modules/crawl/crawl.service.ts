@@ -1,7 +1,16 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Cron } from '@nestjs/schedule';
-import { endOfDay, format, parse, startOfDay } from 'date-fns';
+import {
+	differenceInDays,
+	format,
+	getDay,
+	getDayOfYear,
+	isBefore,
+	isSameDay,
+	parse,
+	subDays,
+} from 'date-fns';
 import { promises as fs } from 'fs';
 import { Model } from 'mongoose';
 import { join } from 'path';
@@ -13,9 +22,10 @@ import {
 import { Mega645 } from 'src/common/schemas/mega645.schema';
 import { Power655 } from 'src/common/schemas/power655.schema';
 // import { RedisService } from 'src/modules/redis/redis.service';
-import { LotteryCrawlUrl, LotteryType } from 'src/types';
-import { GetDataDto } from './dtos/get-data.dto';
+import { convertToMongoDate } from '@/utils/date.utils';
 import { vi } from 'date-fns/locale';
+import { LotteryCrawlUrl, LotteryType } from 'src/types';
+import { GetDataDto } from '../../common/dtos/get-data.dto';
 
 interface LotteryData {
 	type: LotteryType;
@@ -31,6 +41,7 @@ export class CrawlService implements OnModuleInit {
 	) {}
 	private dataDirectory = join(process.cwd(), 'public', 'data');
 	// private CACHE_PREFIX = 'lottery_data';
+	private UPDATE_HOUR = 19;
 	private DRAW_DAYS: Partial<Record<LotteryType, number[]>> = {
 		// CN: 0 .... T7: 6
 		Mega645: [3, 5, 0], // CN, T4, T6
@@ -223,96 +234,215 @@ export class CrawlService implements OnModuleInit {
 		}
 	}
 
+	private async insertDataToDB(
+		lotteryModel,
+		type: LotteryType,
+		fullUpdate: boolean,
+	) {
+		const newData = await this.scrapeData(type, fullUpdate);
+
+		if (!newData || newData.length === 0) {
+			console.log(`❌ No data available for ${type}`);
+			return;
+		}
+
+		// Get existing dates to avoid duplicates
+		const existingDates = new Set(
+			(await lotteryModel.distinct('date')).map((date: string) =>
+				new Date(date).toISOString(),
+			),
+		);
+		const formattedNewData = newData.map((item) => ({
+			...item,
+			date: parse(item.date, 'EEE, dd/MM/yyyy', new Date(), {
+				locale: vi,
+			}), // parse date
+		}));
+
+		// Filter records to add
+		const newRecords = formattedNewData.filter(
+			(item) => !existingDates.has(item.date.toISOString()), // compare ISO string
+		);
+
+		if (newRecords.length === 0) {
+			console.log(`✅ No new records to add for ${type}`);
+			return;
+		}
+		// Insert the new records
+		try {
+			const insertResult = await lotteryModel.insertMany(newRecords);
+
+			return {
+				data: insertResult,
+				message: `✅ Inserted ${insertResult.length} new records for ${type}`,
+			};
+		} catch (error) {
+			throw error;
+		}
+	}
+
+	private toVietnamDate = (utcDate) => {
+		const vietnamOffset = 7 * 60; // GMT+7 (phút)
+		return new Date(utcDate.getTime() + vietnamOffset * 60 * 1000);
+	};
+
+	// private shouldUpdateData(type: LotteryType, latestRecordDate): boolean {
+	// 	const now = new Date(); // Tự động lấy VN time
+	// 	const today = now.getDay();
+	// 	const currentTime = now.getHours() * 60 + now.getMinutes();
+	// 	const cutoffTime = this.UPDATE_HOUR * 60;
+
+	// 	// Lấy thời gian địa phương cụ thể thay vì dựa vào offset
+	// 	// const vietnamTime = new Date(
+	// 	// 	now.toLocaleString('en-US', { timeZone: 'Asia/Ho_Chi_Minh' }),
+	// 	// );
+	// 	// const today = vietnamTime.getDay();
+	// 	// const currentTime =
+	// 	// 	vietnamTime.getHours() * 60 + vietnamTime.getMinutes();
+	// 	// const cutoffTime = this.UPDATE_HOUR * 60;
+
+	// 	const drawDays = this.DRAW_DAYS[type];
+	// 	if (!drawDays) return false;
+
+	// 	// Tìm ngày quay số gần nhất
+	// 	const daysSinceLastDraw = drawDays
+	// 		.map((drawDay) => {
+	// 			let diff = today - drawDay;
+	// 			if (diff < 0) diff += 7; // Quay lại tuần trước nếu cần
+	// 			return diff;
+	// 		})
+	// 		.sort((a, b) => a - b)[0];
+
+	// 	// Tạo ngày quay số gần nhất
+	// 	const lastDrawDate = new Date(now);
+	// 	lastDrawDate.setDate(now.getDate() - daysSinceLastDraw);
+	// 	lastDrawDate.setHours(0, 0, 0, 0);
+
+	// 	// Chuyển ngày từ MongoDB sang múi giờ đúng
+	// 	const latestDate = this.toVietnamDate(new Date(latestRecordDate));
+	// 	latestDate.setHours(0, 0, 0, 0);
+
+	// 	// Nếu latestDate >= lastDrawDate, đã cập nhật đủ
+	// 	if (latestDate >= lastDrawDate) {
+	// 		console.log(
+	// 			`✅ Data for ${type} is already up to date. No need to update!`,
+	// 		);
+	// 		return false;
+	// 	}
+
+	// 	// Nếu hôm nay là ngày quay SỐ HIỆN TẠI và chưa tới giờ quay
+	// 	if (drawDays.includes(today) && currentTime < cutoffTime) {
+	// 		// Kiểm tra dữ liệu
+	// 		// const msPerDay = 24 * 60 * 60 * 1000;
+	// 		const lastDrawBeforeToday = new Date(lastDrawDate);
+	// 		if (daysSinceLastDraw === 0) {
+	// 			// Nếu ngày quay là hôm nay, lùi về kỳ quay trước đó
+	// 			const previousDrawDays = [...drawDays].sort((a, b) => a - b);
+	// 			const prevDrawDay =
+	// 				previousDrawDays[previousDrawDays.length - 1];
+	// 			const diff = today - prevDrawDay;
+	// 			const daysToPrevDraw = diff > 0 ? diff : diff + 7;
+	// 			lastDrawBeforeToday.setDate(
+	// 				now.getDate() - daysToPrevDraw,
+	// 			);
+	// 		}
+
+	// 		// Kiểm tra xem latestDate có cũ hơn kỳ quay trước đó không
+	// 		if (latestDate < lastDrawBeforeToday) {
+	// 			console.log(
+	// 				`📊 Missing previous draw data. Updating immediately for ${type}`,
+	// 			);
+	// 			return true;
+	// 		}
+
+	// 		console.log(
+	// 			`⏳ Waiting until 19:00 to update data for ${type} for today's draw`,
+	// 		);
+	// 		return false;
+	// 	}
+
+	// 	console.log(`🔄 Need to update data for ${type}`);
+	// 	return true;
+	// }
+
 	// Update latest data
+
+	private getLastValidDrawDate = (type: LotteryType, today) => {
+		const drawDays = this.DRAW_DAYS[type];
+
+		for (let i = 1; i <= 7; i++) {
+			const checkDate = subDays(today, i);
+			if (drawDays.includes(getDay(checkDate))) {
+				return checkDate;
+			}
+		}
+		return null;
+	};
+
+	private shouldUpdateData = (
+		type: LotteryType,
+		latestRecordDate,
+		now = new Date(),
+	) => {
+		const lastDate = this.toVietnamDate(latestRecordDate);
+		const drawDays = this.DRAW_DAYS[type];
+
+		if (!drawDays) return false;
+
+		const isLastDrawDay = drawDays.includes(getDayOfYear(lastDate));
+		const lastValidDrawDate = this.getLastValidDrawDate(type, now);
+		const nowMinutes = now.getHours() * 60 + now.getMinutes();
+		const lastMinutes = lastDate.getHours() * 60 + lastDate.getMinutes();
+
+		// Nếu dữ liệu cũ hơn ngày quay số gần nhất
+		if (lastValidDrawDate && isBefore(lastDate, lastValidDrawDate)) {
+			return true;
+		}
+
+		// Nếu dữ liệu là hôm nay
+		if (isSameDay(now, lastDate)) {
+			console.log('wait to 19h to update');
+			return (
+				nowMinutes >= this.UPDATE_HOUR * 60 && lastMinutes < nowMinutes
+			);
+		}
+
+		// Nếu dữ liệu là ngày quay số gần nhất và đã qua 19h
+		if (isLastDrawDay && differenceInDays(now, lastDate) <= 7) {
+			return (
+				nowMinutes >= this.UPDATE_HOUR * 60 && lastMinutes < nowMinutes
+			);
+		}
+
+		return isBefore(lastDate, now);
+	};
+
 	async updateLotteryData(type: LotteryType, fullUpdate = false) {
 		try {
 			const lotteryModel: Model<LotteryBase> =
 				type === 'Mega645' ? this.mega645Model : this.power655Model;
 
 			// Get the latest record
-			const latestRecord = await lotteryModel.findOne().exec();
+			const latestRecord = await lotteryModel
+				.findOne()
+				.sort({ date: -1 })
+				.exec();
 
-			const now = new Date();
-			const today = now.getDay();
-			const currentTime = now.getHours() * 60 + now.getMinutes();
-			const cutoffTime = 19 * 60; // 19h
-
-			// Check if it's up to date
-			if (latestRecord) {
-				const latestDate = latestRecord.date;
-				const latestDay = parseInt(
-					latestDate.split(', ')[1].split('/')[0],
-				); // Get day
-
-				// Get latest day in data
-				const drawDays = this.DRAW_DAYS[type];
-				const lastDrawDay = Math.max(
-					...drawDays.filter((d) => d <= today),
-				);
-
-				// Get latest result day
-				const expectedDrawDate = now;
-				expectedDrawDate.setDate(
-					expectedDrawDate.getDate() - (today - lastDrawDay),
-				);
-				const expectedDrawDay = expectedDrawDate.getDate();
-
-				if (latestDay >= expectedDrawDay) {
-					console.log(
-						`✅ Data for ${type} is already up to date. No need to update!`,
-					);
-					return;
-				}
-
-				// If today is a draw day, wait until after the cutoff time
-				if (today === lastDrawDay && currentTime < cutoffTime) {
-					console.log(
-						`⏳ Waiting until 19:00 to update data for ${type}`,
-					);
-					return;
-				}
+			if (!latestRecord) {
+				// Update full data
+				this.insertDataToDB(lotteryModel, type, true);
 			}
-			const newData = await this.scrapeData(type, fullUpdate);
-
-			if (!newData || newData.length === 0) {
-				console.log(`❌ No data available for ${type}`);
-				return;
-			}
-
-			// Get existing dates to avoid duplicates
-			const existingDates = new Set(
-				(await lotteryModel.distinct('date')).map((date: string) =>
-					new Date(date).toISOString(),
-				),
-			);
-			const formattedNewData = newData.map((item) => ({
-				...item,
-				date: parse(item.date, 'EEE, dd/MM/yyyy', new Date(), {
-					locale: vi,
-				}), // parse date
-			}));
-
-			// Filter records to add
-			const newRecords = formattedNewData.filter(
-				(item) => !existingDates.has(item.date.toISOString()), // compare ISO string
-			);
-
-			if (newRecords.length === 0) {
-				console.log(`✅ No new records to add for ${type}`);
-				return;
-			}
-
-			// Insert the new records
-			try {
-				const insertResult = await lotteryModel.insertMany(newRecords);
-
+			const shouldUpdate = this.shouldUpdateData(type, latestRecord.date);
+			if (!shouldUpdate) {
 				return {
-					data: insertResult,
-					message: `✅ Inserted ${insertResult.length} new records for ${type}`,
+					message: 'Data is up to date!',
 				};
-			} catch (error) {
-				throw error;
 			}
+
+			// console.log('updateeee');
+			// return;
+
+			return this.insertDataToDB(lotteryModel, type, false);
 		} catch (error) {
 			// console.error(`❌ Error updating ${type}:`, error);
 			throw error;
@@ -349,11 +479,6 @@ export class CrawlService implements OnModuleInit {
 		}
 	}
 
-	convertToMongoDate = (dateStr: string) => {
-		const parsedDate = parse(dateStr, 'dd-MM-yyyy', new Date());
-		return format(parsedDate, 'yyyy-MM-dd 00:00:00.000');
-	};
-
 	public async getLotteryData(query: GetDataDto) {
 		try {
 			// If has cache
@@ -373,42 +498,24 @@ export class CrawlService implements OnModuleInit {
 					? this.mega645Model
 					: this.power655Model;
 			let data: LotteryDocument[] = [];
-			let dbQuery: any = {};
+			const dbQuery: any = {};
 
-			if (query.count) {
-				return await lotteryModel.find().limit(limit).exec();
+			if (query.fromDate) {
+				const formattedFrom = convertToMongoDate(query.fromDate);
+				const formattedTo = query.toDate
+					? convertToMongoDate(query.toDate)
+					: convertToMongoDate(format(new Date(), 'dd-MM-yyyy'));
+
+				dbQuery.date = { $gte: formattedFrom, $lte: formattedTo };
 			}
-			if (query.fromDate && query.toDate) {
-				const formattedFrom = this.convertToMongoDate(query.fromDate);
-				const formattedTo = this.convertToMongoDate(query.toDate);
 
-				dbQuery = {
-					date: {
-						$gte: formattedFrom,
-						$lte: formattedTo,
-					},
-				};
+			return await lotteryModel
+				.find(dbQuery)
+				.sort({ date: -1 })
+				.limit(limit)
+				.exec();
 
-				console.log(`Query from ${query.fromDate} - ${query.toDate}`);
-				data = await lotteryModel.find(dbQuery).exec();
-			} else if (query.fromDate) {
-				const formattedFrom = this.convertToMongoDate(query.fromDate);
-				const formattedTo = this.convertToMongoDate(format(new Date(), 'dd-MM-yyyy'));
-
-				dbQuery = {
-					date: {
-						$gte: formattedFrom,
-						$lte: formattedTo,
-					},
-				};
-
-				console.log(
-					`Query from ${query.fromDate} - now ${format(new Date(), 'dd-MM-yyyy')}`,
-				);
-				data = await lotteryModel.find(dbQuery).exec();
-			} else {
-				data = await lotteryModel.find().limit(limit).exec();
-			}
+			return data;
 
 			// Cache the results
 			// await this.redisService.set(
@@ -416,7 +523,6 @@ export class CrawlService implements OnModuleInit {
 			// 	type,
 			// 	JSON.stringify(data),
 			// );
-			return data;
 
 			// // If no data in MongoDB, scrape it
 			// const scrapedData = await this.scrapeData(type);

@@ -7,7 +7,7 @@ import {
 } from '@nestjs/common';
 import { LotteryType } from 'src/types';
 import { CrawlService } from './crawl.service';
-import { GetDataDto } from './dtos/get-data.dto';
+import { GetDataDto } from '../../common/dtos/get-data.dto';
 
 @Controller('crawl')
 export class CrawlController {
@@ -52,6 +52,9 @@ export class CrawlController {
 		@Query('type') type: LotteryType,
 		@Query('isFull') isFull: boolean,
 	) {
+		if (!type) {
+			throw new HttpException('Type is required', HttpStatus.BAD_REQUEST);
+		}
 		try {
 			const res = await this.crawlService.updateLotteryData(
 				type,

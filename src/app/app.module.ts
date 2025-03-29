@@ -1,3 +1,4 @@
+import { HistoryModule } from './../modules/history/history.module';
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
@@ -12,6 +13,8 @@ import { PredictService } from 'src/modules/predict/predict.service';
 // import { RedisModule } from 'src/modules/redis/redis.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { HistoryController } from '@/modules/history/history.controller';
+import { HistoryService } from '@/modules/history/history.service';
 
 @Module({
 	imports: [
@@ -43,9 +46,20 @@ import { AppService } from './app.service';
 		}),
 		CrawlModule,
 		PredictModule,
+		HistoryModule,
 	],
-	controllers: [AppController, CrawlController, PredictController],
-	providers: [AppService, CrawlService, PredictService],
+	controllers: [
+		AppController,
+		CrawlController,
+		PredictController,
+		// HistoryController,
+	],
+	providers: [
+		AppService,
+		CrawlService,
+		PredictService,
+		// HistoryService
+	],
 })
 export class AppModule {}
 // export class AppModule implements OnModuleInit {
