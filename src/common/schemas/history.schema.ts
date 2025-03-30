@@ -24,6 +24,13 @@ export class PredictHistory {
 
 	@Prop({ type: [String], required: true })
 	numbers: string[];
+
+	@Prop({
+		type: Boolean,
+		required: false,
+		default: false,
+	})
+	isAI?: boolean;
 }
 
 export const PredictHistorySchema =

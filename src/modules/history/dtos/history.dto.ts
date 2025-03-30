@@ -1,6 +1,14 @@
 import { LotteryType } from '@/types/index';
 import { Type } from 'class-transformer';
-import { IsArray, IsDate, IsEnum, IsString, Validate } from 'class-validator';
+import {
+	IsArray,
+	IsBoolean,
+	IsDate,
+	IsEnum,
+	IsOptional,
+	IsString,
+	Validate,
+} from 'class-validator';
 
 import {
 	ValidationArguments,
@@ -44,8 +52,26 @@ class PredictHistoryDto {
 
 	@Validate(NumbersValidator)
 	numbers: string[];
+
+	@IsBoolean()
+	@IsOptional()
+	isAI: boolean = false;
 }
 
 export class CreatePredictHistoryDto extends PredictHistoryDto {}
 
-export class UpdatePredictHistoryDto extends PredictHistoryDto {}
+// export class UpdatePredictHistoryDto extends PredictHistoryDto {}
+export class UpdatePredictHistoryDto implements Partial<PredictHistoryDto> {
+	@IsDate()
+	@Type(() => Date)
+	@IsOptional()
+	date?: Date;
+
+	@Validate(NumbersValidator)
+	@IsOptional()
+	numbers?: string[];
+
+	@IsBoolean()
+	@IsOptional()
+	isAI?: boolean;
+}

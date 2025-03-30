@@ -110,10 +110,12 @@ export class HistoryService {
 		id: string,
 		updateHistoryDto: UpdatePredictHistoryDto,
 	): Promise<PredictHistory> {
+		// const updatedHistory = await this.historyModel
+		// 	.findByIdAndUpdate(id, updateHistoryDto, { new: true })
+		// 	.exec();
 		const updatedHistory = await this.historyModel
-			.findByIdAndUpdate(id, updateHistoryDto, { new: true })
+			.findByIdAndUpdate(id, { $set: updateHistoryDto }, { new: true })
 			.exec();
-
 		if (!updatedHistory) {
 			throw new NotFoundException(`History with ID ${id} not found`);
 		}

@@ -7,6 +7,7 @@ import {
 	HttpException,
 	HttpStatus,
 	Param,
+	Patch,
 	Post,
 	Put,
 	Query,
@@ -88,20 +89,53 @@ export class HistoryController {
 
 	@Get(':id')
 	async findById(@Param('id') id: string) {
-		return this.historyService.findById(id);
+		try {
+			const res = await this.historyService.findById(id);
+			return { data: res, statusCode: HttpStatus.OK };
+		} catch (error) {
+			throw new HttpException(
+				'Failed to get detail: ' + error.message,
+				HttpStatus.BAD_REQUEST,
+			);
+		}
 	}
 
-	@Put(':id')
+	// @Put(':id')
+	@Patch(':id')
 	async update(
 		@Param('id') id: string,
 		@Body() updateHistoryDto: UpdatePredictHistoryDto,
 	) {
-		return this.historyService.update(id, updateHistoryDto);
+		try {
+			const res = await this.historyService.update(id, updateHistoryDto);
+			return {
+				data: res,
+				statusCode: HttpStatus.OK,
+				message: 'Update successfully',
+			};
+		} catch (error) {
+			throw new HttpException(
+				'Failed to update: ' + error.message,
+				HttpStatus.BAD_REQUEST,
+			);
+		}
 	}
 
 	@Delete(':id')
-	@HttpCode(HttpStatus.NO_CONTENT)
+	// @HttpCode(HttpStatus.NO_CONTENT)
 	async delete(@Param('id') id: string) {
-		return this.historyService.delete(id);
+		try {
+			const res = await this.historyService.delete(id);
+			return {
+				// data: res,
+				statusCode: HttpStatus.OK,
+				message: 'Delete successfully',
+			};
+		} catch (error) {
+			throw new HttpException(
+				'Failed to delete: ' + error.message,
+				HttpStatus.BAD_REQUEST,
+			);
+		}
 	}
 }
