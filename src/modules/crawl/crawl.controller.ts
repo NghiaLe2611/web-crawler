@@ -3,6 +3,8 @@ import {
 	Get,
 	HttpException,
 	HttpStatus,
+	Param,
+	Post,
 	Query,
 } from '@nestjs/common';
 import { LotteryType } from 'src/types';
@@ -84,5 +86,24 @@ export class CrawlController {
 				HttpStatus.BAD_REQUEST,
 			);
 		}
+	}
+
+	@Post('/cache/:type')
+	async cacheData(@Param('type') type: LotteryType): Promise<{
+		statusCode: number;
+		message: string;
+	}> {
+		try {
+			await this.crawlService.saveRedisCacheFromDb(type);
+			return {
+				statusCode: 200,
+				message: `Cache written for ${type}`,
+			};
+		} catch (error) {
+            return {
+				statusCode: 500,
+				message: error?.message ?? `Error writing cache`,
+			};
+        }
 	}
 }

@@ -2,21 +2,17 @@ import {
 	Body,
 	Controller,
 	Delete,
-	Get,
 	HttpException,
 	HttpStatus,
+	NotFoundException,
 	Post,
-	Req,
 	Res,
 } from '@nestjs/common';
-import { PredictService } from './predict.service';
-import {
-	COMMON_ERR_MESSAGE,
-	DEFAULT_PREDICT_PARAMS,
-	MAX_NUMBER,
-} from 'src/constants';
+import * as fs from 'fs/promises';
 import * as path from 'path';
+import { COMMON_ERR_MESSAGE, DEFAULT_PREDICT_PARAMS } from 'src/constants';
 import { LotteryType } from 'src/types';
+import { PredictService } from './predict.service';
 
 class TrainModelDto {
 	data: number[][];
@@ -37,7 +33,7 @@ export class PredictController {
 	constructor(private readonly predictService: PredictService) {}
 
 	@Post('/train')
-	async handleTrainModal(@Body() model: TrainModelDto, @Res() res: any) {
+	async handleTrainModel(@Body() model: TrainModelDto, @Res() res: any) {
 		const { data, optimizer, loss, epochs, lotteryType } = model;
 		if (!data || !data?.length) {
 			return res.status(HttpStatus.BAD_REQUEST).json({
@@ -47,7 +43,7 @@ export class PredictController {
 		}
 
 		try {
-			const result = await this.predictService.trainModelIncrementally(
+			const result = await this.predictService.trainModel(
 				lotteryType,
 				data,
 				optimizer,
@@ -58,12 +54,15 @@ export class PredictController {
 			if (result && result.model) {
 				return res.status(HttpStatus.OK).json({
 					statusCode: HttpStatus.OK,
-					message: 'Train model sucessfully',
+					message: result.existed
+						? 'Incrementally train model sucessfully'
+						: 'Train model sucessfully',
 					optimizer: optimizer || DEFAULT_PREDICT_PARAMS.optimizer,
 					losses: loss || DEFAULT_PREDICT_PARAMS.loss,
 					epochs: epochs || DEFAULT_PREDICT_PARAMS.epochs,
-					loss: result.lastEpochLogs?.loss || null,
-					acc: result.lastEpochLogs?.acc || null,
+					metrics: result.lastEpochLogs,
+					// loss: result.lastEpochLogs?.loss || null,
+					// acc: result.lastEpochLogs?.acc || null,
 				});
 			}
 
@@ -72,6 +71,36 @@ export class PredictController {
 				message: COMMON_ERR_MESSAGE,
 			});
 		} catch (error) {
+			throw new HttpException(
+				error.message,
+				HttpStatus.INTERNAL_SERVER_ERROR,
+			);
+		}
+	}
+
+	@Post('/trainAll')
+	async handleTrainAll(@Body() model: TrainModelDto, @Res() res: any) {
+		const { optimizer, loss, epochs, lotteryType } = model;
+
+		try {
+			const result = await this.predictService.trainAll(
+				lotteryType,
+				optimizer,
+				loss,
+				epochs,
+			);
+
+			return res.status(HttpStatus.OK).json({
+				statusCode: HttpStatus.OK,
+				data: result,
+			});
+		} catch (error) {
+			const errData = error.response ?? null;
+
+			if (errData) {
+				throw new HttpException(errData.message, errData.statusCode);
+			}
+
 			throw new HttpException(
 				error.message,
 				HttpStatus.INTERNAL_SERVER_ERROR,
@@ -96,28 +125,34 @@ export class PredictController {
 		);
 
 		try {
-			const result = await this.predictService.predict(
-				lotteryType,
-				lotteryHistory,
-				modelPath,
-			);
-			if (result) {
+			await fs.access(modelPath);
+			try {
+				const result = await this.predictService.predict(
+					lotteryType,
+					lotteryHistory,
+					modelPath,
+				);
+
+				if (result) {
+					return res.status(200).json({
+						statusCode: HttpStatus.OK,
+						data: result.data,
+						// accuracy: result.accuracy,
+					});
+				}
+
 				return res.status(200).json({
 					statusCode: HttpStatus.OK,
-					data: result.data,
-					accuracy: result.accuracy,
+					data: [],
 				});
+			} catch (error) {
+				throw new HttpException(
+					error.message,
+					HttpStatus.INTERNAL_SERVER_ERROR,
+				);
 			}
-
-			return res.status(200).json({
-				statusCode: HttpStatus.OK,
-				data: [],
-			});
 		} catch (error) {
-			throw new HttpException(
-				error.message,
-				HttpStatus.INTERNAL_SERVER_ERROR,
-			);
+			throw new NotFoundException(`Model ${inputPath} does not exist`);
 		}
 	}
 

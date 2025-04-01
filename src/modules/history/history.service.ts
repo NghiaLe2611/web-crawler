@@ -28,7 +28,8 @@ export class HistoryService {
 	// }
 	async create(
 		createHistoryDto: CreatePredictHistoryDto,
-	): Promise<{ data: PredictHistory; isUpdated: boolean }> {
+	): Promise<PredictHistory> {
+		// Promise<{ data: PredictHistory; isUpdated?: boolean }>
 		// Extract date from the DTO
 		const predictionDate = createHistoryDto.date;
 
@@ -39,30 +40,30 @@ export class HistoryService {
 		endOfDay.setUTCHours(23, 59, 59, 999);
 
 		// Check if prediction already exists
-		const existingPrediction = await this.historyModel.findOne({
-			date: {
-				$gte: startOfDay,
-				$lte: endOfDay,
-			},
-			type: createHistoryDto.type,
-		});
+		// const existingPrediction = await this.historyModel.findOne({
+		// 	date: {
+		// 		$gte: startOfDay,
+		// 		$lte: endOfDay,
+		// 	},
+		// 	type: createHistoryDto.type,
+		// });
 
 		// Update
-		if (existingPrediction) {
-			const updatedPrediction = await this.historyModel.findByIdAndUpdate(
-				existingPrediction._id,
-				{ ...createHistoryDto },
-				{ new: true },
-			);
+		// if (existingPrediction) {
+		// 	const updatedPrediction = await this.historyModel.findByIdAndUpdate(
+		// 		existingPrediction._id,
+		// 		{ ...createHistoryDto },
+		// 		{ new: true },
+		// 	);
 
-			return { data: updatedPrediction, isUpdated: true };
-		}
+		// 	return { data: updatedPrediction, isUpdated: true };
+		// }
 
 		// Create new
 		const createdHistory = new this.historyModel(createHistoryDto);
 		const savedHistory = await createdHistory.save();
-
-		return { data: savedHistory, isUpdated: false };
+		return savedHistory;
+		// return { data: savedHistory, isUpdated: false };
 	}
 
 	// async findAll(): Promise<PredictHistory[]> {

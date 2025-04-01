@@ -1,9 +1,10 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import * as tf from '@tensorflow/tfjs-node';
 import * as fs from 'fs';
 import * as path from 'path';
 import { MAX_NUMBER, NUMBERS } from 'src/constants';
 import { LotteryType } from 'src/types';
+import { RedisService } from '../redis/redis.service';
 
 // Window Size (w): Determines the number of previous data points used as input features to predict the next data point.
 const WINDOW_LENGTH = 2;
@@ -20,8 +21,18 @@ const WINDOW_LENGTH = 2;
 // 	arrayOfArrays.forEach(shuffleArray); // Apply shuffle to each sub-array
 // }
 
+interface Metrics {
+	loss: number;
+	mse: number;
+	mae: number;
+	acc: number;
+}
+
 @Injectable()
 export class PredictService {
+	constructor(private readonly redisService: RedisService) {}
+	private CACHE_PREFIX = 'lottery_data';
+
 	private getModelPath(
 		lotteryType: LotteryType,
 		optimizer: string,
@@ -40,22 +51,42 @@ export class PredictService {
 		return modelPath;
 	}
 
-	private getAccuracyPath(modelPath: string): string {
-		return path.join(modelPath, 'accuracy.json');
+	// private getAccuracyPath(modelPath: string): string {
+	// 	return path.join(modelPath, 'accuracy.json');
+	// }
+
+	// async saveAccuracy(modelPath: string, accuracy: number): Promise<void> {
+	// 	const accuracyPath = this.getAccuracyPath(modelPath);
+	// 	const accuracyData = JSON.stringify({ accuracy }, null, 2);
+	// 	fs.writeFileSync(accuracyPath, accuracyData);
+	// }
+
+	// async loadAccuracy(modelPath: string): Promise<number | null> {
+	// 	const accuracyPath = this.getAccuracyPath(modelPath);
+	// 	if (fs.existsSync(accuracyPath)) {
+	// 		const accuracyData = fs.readFileSync(accuracyPath, 'utf-8');
+	// 		const { accuracy } = JSON.parse(accuracyData);
+	// 		return accuracy;
+	// 	}
+	// 	return null;
+	// }
+
+	private getMetrics(modelPath: string): string {
+		return path.join(modelPath, 'mse.json');
 	}
 
-	async saveAccuracy(modelPath: string, accuracy: number): Promise<void> {
-		const accuracyPath = this.getAccuracyPath(modelPath);
-		const accuracyData = JSON.stringify({ accuracy }, null, 2);
-		fs.writeFileSync(accuracyPath, accuracyData);
+	async saveMetrics(modelPath: string, metrics: Metrics): Promise<void> {
+		const msePath = this.getMetrics(modelPath);
+		const mseData = JSON.stringify(metrics, null, 2);
+		fs.writeFileSync(msePath, mseData);
 	}
 
-	async loadAccuracy(modelPath: string): Promise<number | null> {
-		const accuracyPath = this.getAccuracyPath(modelPath);
-		if (fs.existsSync(accuracyPath)) {
-			const accuracyData = fs.readFileSync(accuracyPath, 'utf-8');
-			const { accuracy } = JSON.parse(accuracyData);
-			return accuracy;
+	async loadMetrics(modelPath: string): Promise<Metrics | null> {
+		const msePath = this.getMetrics(modelPath);
+		if (fs.existsSync(msePath)) {
+			const mseData = fs.readFileSync(msePath, 'utf-8');
+			const metrics = JSON.parse(mseData);
+			return metrics;
 		}
 		return null;
 	}
@@ -160,122 +191,15 @@ export class PredictService {
 		const maxNumber = MAX_NUMBER[lotteryType];
 		const numberOfFeatures = NUMBERS[lotteryType];
 
-		// Ensure there are enough data points
-		if (numberOfRows <= WINDOW_LENGTH) {
-			throw new Error(
-				'Not enough data points to create training examples.',
-			);
-		}
-
-		// shuffleArrayOfArrays(lotteryHistory);
-		// Normalize the data to the range [0, 1]
-		const scaledLotteryHistory = lotteryHistory.map((row) =>
-			row.map((num) => num / maxNumber),
-		);
-
-		// Prepare train and label data
-		const train = [];
-		const label = [];
-
-		for (let i = 0; i < numberOfRows - WINDOW_LENGTH; i++) {
-			const window = scaledLotteryHistory.slice(i, i + WINDOW_LENGTH);
-			train.push(window);
-			label.push(scaledLotteryHistory[i + WINDOW_LENGTH]);
-		}
-
-		const trainTensor = tf.tensor3d(train);
-		const labelTensor = tf.tensor2d(label);
-
-		const model = await this.loadOrCreateModel(
-			lotteryType,
-			optimizer,
-			loss,
-			WINDOW_LENGTH,
-			numberOfFeatures,
-		);
-
-		let lastEpochLogs;
-
-		/*
-            Single Call to model.fit: Simpler and potentially more optimized by TensorFlow.js, but can be memory-intensive for large datasets and provides less control over the training process.
-            Loop with Batches: More complex but offers better memory efficiency and control over the training process. Ideal for large datasets and when you need custom training routines.
-        */
-
-		// Train the model
-		await model.fit(trainTensor, labelTensor, {
-			epochs,
-			shuffle: true,
-			callbacks: {
-				onEpochEnd: (epoch, logs) => {
-					lastEpochLogs = logs;
-					// console.log(
-					// 	`Epoch ${epoch + 1}: loss = ${logs.loss}, accuracy = ${logs.acc}`,
-					// );
-				},
-			},
-		});
-
-		// Train the model incrementally
-		// for (let epoch = 0; epoch < epochs; epoch++) {
-		// 	for (let i = 0; i < trainTensor.shape[0]; i += BATCH_SIZE) {
-		// 		const batchEnd = Math.min(i + BATCH_SIZE, trainTensor.shape[0]);
-		// 		const batchX = trainTensor.slice(
-		// 			[i, 0, 0],
-		// 			[batchEnd - i, -1, -1],
-		// 		);
-		// 		const batchY = labelTensor.slice([i, 0], [batchEnd - i, -1]);
-
-		// 		await model.fit(batchX, batchY, {
-		// 			epochs: 1,
-		// 			shuffle: false,
-		// 			callbacks: {
-		// 				onEpochEnd: (epoch, logs) => {
-		// 					lastEpochLogs = logs;
-		// 				},
-		// 			},
-		// 		});
-
-		// 		// console.log(
-		// 		// 	`Batch ${i / BATCH_SIZE + 1}: loss = ${history.history.loss[0]}, accuracy = ${history.history.acc[0]}`,
-		// 		// );
-		// 	}
-		// }
-
-		const savePath = await this.saveModel(
-			model,
-			lotteryType,
-			optimizer,
-			loss,
-		);
-		if (lastEpochLogs) {
-			await this.saveAccuracy(savePath, lastEpochLogs.acc);
-		}
-		return { model, modelPath: savePath, lastEpochLogs };
-	}
-
-	async trainModelIncrementally(
-		lotteryType: LotteryType = 'Power655',
-		lotteryHistory: Record<string, any>[],
-		optimizer: string,
-		loss: string,
-		epochs: number,
-	) {
-		const numberOfRows = lotteryHistory.length;
-		const maxNumber = MAX_NUMBER[lotteryType];
-		const numberOfFeatures = NUMBERS[lotteryType];
-
+		// Kiểm tra số lượng dữ liệu đầu vào
 		if (numberOfRows <= WINDOW_LENGTH) {
 			throw new Error(
 				`Not enough data points to create training examples. Need more than ${WINDOW_LENGTH} data points.`,
 			);
 		}
 
-		// Normalize the data
-		// const scaledLotteryHistory = lotteryHistory.map((row) =>
-		// 	row.map((num) => num / maxNumber),
-		// );
+		// Chuẩn hóa dữ liệu
 		const scaledLotteryHistory = lotteryHistory.map((row) => {
-			// Ensure each row has exactly 6 numbers by slicing or padding if necessary
 			const numbers = Array.isArray(row)
 				? row.slice(0, 6)
 				: Object.values(row).slice(0, 6);
@@ -287,7 +211,7 @@ export class PredictService {
 			return numbers.map((num) => num / maxNumber);
 		});
 
-		// Prepare train and label data
+		// Chuẩn bị dữ liệu train & label
 		const train = [];
 		const label = [];
 		for (let i = 0; i < numberOfRows - WINDOW_LENGTH; i++) {
@@ -296,8 +220,6 @@ export class PredictService {
 			label.push(scaledLotteryHistory[i + WINDOW_LENGTH]);
 		}
 
-		// const trainTensor = tf.tensor3d(train);
-		// const labelTensor = tf.tensor2d(label);
 		const trainTensor = tf.tensor3d(train, [
 			train.length,
 			WINDOW_LENGTH,
@@ -311,27 +233,41 @@ export class PredictService {
 		let model;
 		const modelPath = this.getModelPath(lotteryType, optimizer, loss);
 
+		let isIncremental = false;
 		try {
-			// Try to load existing model
 			model = await this.loadModel(modelPath);
 			console.log(
-				'Existing model loaded. Performing incremental learning.',
+				'Existing model found. Performing incremental learning.',
 			);
 
-			// Fine-tuning: Freeze all layers except the last two
+			// Freeze tất cả lớp trừ lớp cuối cùng
 			for (let i = 0; i < model.layers.length - 2; i++) {
 				model.layers[i].trainable = false;
 			}
 
-			// Recompile with a lower learning rate for fine-tuning
-			const learningRate = 0.001;
-			const newOptimizer = tf.train.adam(learningRate);
+			// Fine-tuning
+			let learningRate = 0.001;
+
+			if (optimizer === 'rmsprop' && loss === 'meanSquaredError') {
+				learningRate = 0.0005;
+			} else if (optimizer === 'adam' && loss === 'meanAbsoluteError') {
+				learningRate = 0.0005;
+			} else if (optimizer === 'adam' && loss === 'huberLoss') {
+				learningRate = 0.001;
+			}
+			const newOptimizer =
+				optimizer === 'adam'
+					? tf.train.adam(learningRate)
+					: tf.train.rmsprop(learningRate);
+
 			model.compile({
 				optimizer: newOptimizer,
 				loss: loss,
-				metrics: ['accuracy'],
+				metrics: ['mse', 'mae', 'accuracy'],
 			});
+			isIncremental = true;
 		} catch (error) {
+			// Tạo mới mô hình
 			console.log('No existing model found. Creating a new model.');
 			model = await this.createNewModel(
 				optimizer,
@@ -343,16 +279,14 @@ export class PredictService {
 
 		let lastEpochLogs;
 
-		// Train the model
+		// Huấn luyện mô hình
 		await model.fit(trainTensor, labelTensor, {
 			epochs,
 			shuffle: true,
 			callbacks: {
 				onEpochEnd: (epoch, logs) => {
+					console.log('lastEpochLogs', lastEpochLogs);
 					lastEpochLogs = logs;
-					// console.log(
-					// 	`Epoch ${epoch + 1}: loss = ${logs.loss}, accuracy = ${logs.acc}`,
-					// );
 				},
 			},
 		});
@@ -364,14 +298,145 @@ export class PredictService {
 			loss,
 		);
 
-		// Clean up tensors
+		// Dọn dẹp bộ nhớ
 		// trainTensor.dispose();
 		// labelTensor.dispose();
 
 		if (lastEpochLogs) {
-			await this.saveAccuracy(savePath, lastEpochLogs.acc);
+			await this.saveMetrics(savePath, lastEpochLogs);
+			// MSE càng nhỏ càng tốt, accuracy ngược lại
 		}
-		return { model, modelPath: savePath, lastEpochLogs };
+
+		return {
+			model,
+			modelPath: savePath,
+			lastEpochLogs,
+			existed: isIncremental,
+		};
+	}
+
+	// Train all history
+	async trainAll(
+		lotteryType: LotteryType = 'Power655',
+		optimizer: string,
+		loss: string,
+		epochs: number,
+	) {
+		const lotteryHistory = await this.redisService.get(
+			this.CACHE_PREFIX,
+			lotteryType,
+		);
+
+        throw new NotFoundException(`History not found`);
+
+        if (!lotteryHistory) {
+            return;
+        } 
+        
+        // return JSON.parse(lotteryHistory);
+
+        const maxNumber = MAX_NUMBER[lotteryType];
+		const numberOfFeatures = NUMBERS[lotteryType];
+		const numberOfRows = lotteryHistory.length;
+
+		if (numberOfRows <= WINDOW_LENGTH) {
+			throw new Error(
+				`Not enough data points to create training examples. Need more than ${WINDOW_LENGTH} data points.`,
+			);
+		}
+
+		const scaledLotteryHistory = lotteryHistory.map((row) => {
+			const numbers = Array.isArray(row.numbers)
+				? row.numbers.slice(0, 6)
+				: [];
+			if (numbers.length !== 6) {
+				throw new Error(
+					`Each lottery draw must contain exactly 6 numbers, got ${numbers.length}`,
+				);
+			}
+			return numbers.map((num) => num / maxNumber);
+		});
+
+		const train = [];
+		const label = [];
+		for (let i = 0; i < numberOfRows - WINDOW_LENGTH; i++) {
+			const window = scaledLotteryHistory.slice(i, i + WINDOW_LENGTH);
+			train.push(window);
+			label.push(scaledLotteryHistory[i + WINDOW_LENGTH]);
+		}
+
+		const trainTensor = tf.tensor3d(train, [
+			train.length,
+			WINDOW_LENGTH,
+			numberOfFeatures,
+		]);
+		const labelTensor = tf.tensor2d(label, [
+			label.length,
+			numberOfFeatures,
+		]);
+
+		let model = await this.createNewModel(
+			optimizer,
+			loss,
+			WINDOW_LENGTH,
+			numberOfFeatures,
+		);
+
+		let learningRate = 0.001;
+
+		if (optimizer === 'rmsprop' && loss === 'meanSquaredError') {
+			learningRate = 0.0005;
+		} else if (optimizer === 'adam' && loss === 'meanAbsoluteError') {
+			learningRate = 0.0005;
+		} else if (optimizer === 'adam' && loss === 'huberLoss') {
+			learningRate = 0.001;
+		}
+		const newOptimizer =
+			optimizer === 'adam'
+				? tf.train.adam(learningRate)
+				: tf.train.rmsprop(learningRate);
+
+		model.compile({
+			optimizer: newOptimizer,
+			loss: loss,
+			metrics: ['mse', 'mae', 'accuracy'],
+		});
+
+		let lastEpochLogs;
+
+		// Huấn luyện mô hình
+		await model.fit(trainTensor, labelTensor, {
+			epochs,
+			shuffle: true,
+			callbacks: {
+				onEpochEnd: (epoch, logs) => {
+					lastEpochLogs = logs;
+				},
+			},
+		});
+
+		// Lưu mô hình
+		const savePath = await this.saveModel(
+			model,
+			lotteryType,
+			optimizer,
+			loss,
+		);
+
+		// Dọn dẹp bộ nhớ
+		// trainTensor.dispose();
+		// labelTensor.dispose();
+
+		if (lastEpochLogs) {
+			await this.saveMetrics(savePath, lastEpochLogs);
+		}
+
+		return {
+			model,
+			modelPath: savePath,
+			lastEpochLogs,
+			existed: false,
+		};
 	}
 
 	async predict(
@@ -380,14 +445,14 @@ export class PredictService {
 		modelPath: string,
 	) {
 		const model = await this.loadModel(modelPath);
-		const accuracy = await this.loadAccuracy(modelPath);
+		const mse = await this.loadMetrics(modelPath);
 
 		const toPredict = history.slice(0, 2);
 		// Normalize the prediction input
 		// const scaledToPredict = toPredict.map((row) =>
 		// 	row.map((value) => value / MAX_NUMBER[lotteryType]),
 		// );
-        const scaledToPredict = toPredict.map((row) => {
+		const scaledToPredict = toPredict.map((row) => {
 			const numbers = row.slice(0, 6);
 			if (numbers.length !== 6) {
 				throw new Error(
@@ -423,7 +488,7 @@ export class PredictService {
 			data: predictionOutput.map((value) =>
 				Math.round(value * MAX_NUMBER[lotteryType]),
 			),
-			accuracy,
+			mse,
 		};
 	}
 
@@ -657,3 +722,12 @@ async function handlePredict() {
 	return roundedPredictedNumbers;
 }
 */
+
+// Feature Engineering: Thêm các thuộc tính mới vào dữ liệu đầu vào:
+
+// Tần suất xuất hiện của các số
+// Khoảng thời gian giữa các lần xuất hiện
+// Các mẫu tuần hoàn trong lịch sử
+
+// chống overfiting: model.add(tf.layers.dropout({ rate: 0.2 }));
+// sparse_categorical_crossentropy categorical_crossentropy

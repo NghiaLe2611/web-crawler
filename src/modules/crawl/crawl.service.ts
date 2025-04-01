@@ -26,6 +26,7 @@ import { convertToMongoDate } from '@/utils/date.utils';
 import { vi } from 'date-fns/locale';
 import { LotteryCrawlUrl, LotteryType } from 'src/types';
 import { GetDataDto } from '../../common/dtos/get-data.dto';
+import { RedisService } from '../redis/redis.service';
 
 interface LotteryData {
 	type: LotteryType;
@@ -35,12 +36,12 @@ interface LotteryData {
 @Injectable()
 export class CrawlService implements OnModuleInit {
 	constructor(
-		// private readonly redisService: RedisService,
+		private readonly redisService: RedisService,
 		@InjectModel(Mega645.name) private mega645Model: Model<Mega645>,
 		@InjectModel(Power655.name) private power655Model: Model<Power655>,
 	) {}
 	private dataDirectory = join(process.cwd(), 'public', 'data');
-	// private CACHE_PREFIX = 'lottery_data';
+	private CACHE_PREFIX = 'lottery_data';
 	private UPDATE_HOUR = 19;
 	private DRAW_DAYS: Partial<Record<LotteryType, number[]>> = {
 		// CN: 0 .... T7: 6
@@ -271,6 +272,9 @@ export class CrawlService implements OnModuleInit {
 		// Insert the new records
 		try {
 			const insertResult = await lotteryModel.insertMany(newRecords);
+
+            // Update cache
+            await this.updateCacheAfterInsert(type, newRecords);
 
 			return {
 				data: insertResult,
@@ -534,6 +538,54 @@ export class CrawlService implements OnModuleInit {
 		} catch (error) {
 			throw error;
 		}
+	}
+
+	async saveRedisCacheFromDb(type: LotteryType): Promise<void> {
+		const lotteryModel: Model<LotteryBase> =
+			type === 'Mega645' ? this.mega645Model : this.power655Model;
+
+		// Get all data
+		const data = await lotteryModel.find().lean().exec();
+
+		if (!data || data.length === 0) {
+			console.log(`❌ No data found in MongoDB for ${type}`);
+			await this.redisService.set(
+				this.CACHE_PREFIX,
+				type,
+				JSON.stringify(JSON.stringify([])),
+			);
+			return;
+		}
+
+		// Save to redis
+		await this.redisService.set(
+			this.CACHE_PREFIX,
+			type,
+			JSON.stringify(data),
+		);
+		console.log(`✅ Cached ${data.length} records for ${type} in Redis`);
+	}
+
+	private async updateCacheAfterInsert(
+		type: LotteryType,
+		newRecords: any[],
+	): Promise<void> {
+		const cachedData = await this.redisService.get(
+			this.CACHE_PREFIX,
+			type,
+		);
+		let currentData = cachedData ? JSON.parse(cachedData) : [];
+		currentData = [...newRecords, ...currentData];
+
+		// Ghi lại vào Redis
+		await await this.redisService.set(
+			this.CACHE_PREFIX,
+			type,
+			JSON.stringify(currentData),
+		);
+		console.log(
+			`✅ Updated cache with ${newRecords.length} new records for ${type}`,
+		);
 	}
 }
 

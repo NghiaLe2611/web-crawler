@@ -31,14 +31,15 @@ export class HistoryController {
 		@Res() res: any,
 	) {
 		try {
-			const { data, isUpdated } =
+			const data =
 				await this.historyService.create(createHistoryDto);
 			return res.status(200).json({
 				statusCode: HttpStatus.OK,
 				data,
-				message: isUpdated
-					? 'Predict existed so it has been updated successfully'
-					: 'Predict successfully',
+				message: 'Predict successfully',
+				// message: isUpdated
+				// 	? 'Predict existed so it has been updated successfully'
+				// 	: 'Predict successfully',
 			});
 		} catch (error) {
 			throw new HttpException(

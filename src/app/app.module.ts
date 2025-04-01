@@ -10,7 +10,7 @@ import { CrawlService } from 'src/modules/crawl/crawl.service';
 import { PredictController } from 'src/modules/predict/predict.controller';
 import { PredictModule } from 'src/modules/predict/predict.module';
 import { PredictService } from 'src/modules/predict/predict.service';
-// import { RedisModule } from 'src/modules/redis/redis.module';
+import { RedisModule } from 'src/modules/redis/redis.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { HistoryController } from '@/modules/history/history.controller';
@@ -26,7 +26,7 @@ import { HistoryService } from '@/modules/history/history.service';
 			isGlobal: true, // Makes ConfigModule available globally
 		}),
 		ScheduleModule.forRoot(),
-		// RedisModule.forRoot(),
+		RedisModule.forRoot(),
 		MongooseModule.forRootAsync({
 			imports: [ConfigModule],
 			useFactory: async () => ({

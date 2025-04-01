@@ -1,0 +1,193 @@
+	async trainModel(
+		lotteryType: LotteryType = 'Power655',
+		lotteryHistory: Record<string, any>[],
+		optimizer: string,
+		loss: string,
+		epochs: number,
+	) {
+		const numberOfRows = lotteryHistory.length;
+		const maxNumber = MAX_NUMBER[lotteryType];
+		const numberOfFeatures = NUMBERS[lotteryType];
+
+		// Ensure there are enough data points
+		if (numberOfRows <= WINDOW_LENGTH) {
+			throw new Error(
+				'Not enough data points to create training examples.',
+			);
+		}
+
+		// Normalize the data to the range [0, 1]
+		const scaledLotteryHistory = lotteryHistory.map((row) =>
+			row.map((num) => num / maxNumber),
+		);
+
+		// Prepare train and label data
+		const train = [];
+		const label = [];
+
+		for (let i = 0; i < numberOfRows - WINDOW_LENGTH; i++) {
+			const window = scaledLotteryHistory.slice(i, i + WINDOW_LENGTH);
+			train.push(window);
+			label.push(scaledLotteryHistory[i + WINDOW_LENGTH]);
+		}
+
+		const trainTensor = tf.tensor3d(train);
+		const labelTensor = tf.tensor2d(label);
+
+		const model = await this.loadOrCreateModel(
+			lotteryType,
+			optimizer,
+			loss,
+			WINDOW_LENGTH,
+			numberOfFeatures,
+		);
+
+		let lastEpochLogs;
+
+		/*
+            Single Call to model.fit: Simpler and potentially more optimized by TensorFlow.js, but can be memory-intensive for large datasets and provides less control over the training process.
+            Loop with Batches: More complex but offers better memory efficiency and control over the training process. Ideal for large datasets and when you need custom training routines.
+        */
+
+		// Train the model
+		await model.fit(trainTensor, labelTensor, {
+			epochs,
+			shuffle: true,
+			callbacks: {
+				onEpochEnd: (epoch, logs) => {
+					lastEpochLogs = logs;
+					// console.log(
+					// 	`Epoch ${epoch + 1}: loss = ${logs.loss}, accuracy = ${logs.acc}`,
+					// );
+				},
+			},
+		});
+
+		const savePath = await this.saveModel(
+			model,
+			lotteryType,
+			optimizer,
+			loss,
+		);
+		if (lastEpochLogs) {
+			await this.saveAccuracy(savePath, lastEpochLogs.acc);
+		}
+		return { model, modelPath: savePath, lastEpochLogs };
+	}
+
+	async trainModelIncrementally(
+		lotteryType: LotteryType = 'Power655',
+		lotteryHistory: Record<string, any>[],
+		optimizer: string,
+		loss: string,
+		epochs: number,
+	) {
+		const numberOfRows = lotteryHistory.length;
+		const maxNumber = MAX_NUMBER[lotteryType];
+		const numberOfFeatures = NUMBERS[lotteryType];
+
+		if (numberOfRows <= WINDOW_LENGTH) {
+			throw new Error(
+				`Not enough data points to create training examples. Need more than ${WINDOW_LENGTH} data points.`,
+			);
+		}
+
+		// Normalize the data
+		const scaledLotteryHistory = lotteryHistory.map((row) => {
+			// Ensure each row has exactly 6 numbers by slicing or padding if necessary
+			const numbers = Array.isArray(row)
+				? row.slice(0, 6)
+				: Object.values(row).slice(0, 6);
+			if (numbers.length !== 6) {
+				throw new Error(
+					`Each lottery draw must contain exactly 6 numbers, got ${numbers.length}`,
+				);
+			}
+			return numbers.map((num) => num / maxNumber);
+		});
+
+		// Prepare train and label data
+		const train = [];
+		const label = [];
+		for (let i = 0; i < numberOfRows - WINDOW_LENGTH; i++) {
+			const window = scaledLotteryHistory.slice(i, i + WINDOW_LENGTH);
+			train.push(window);
+			label.push(scaledLotteryHistory[i + WINDOW_LENGTH]);
+		}
+
+        const trainTensor = tf.tensor3d(train, [
+			train.length,
+			WINDOW_LENGTH,
+			numberOfFeatures,
+		]);
+		const labelTensor = tf.tensor2d(label, [
+			label.length,
+			numberOfFeatures,
+		]);
+
+		let model;
+		const modelPath = this.getModelPath(lotteryType, optimizer, loss);
+
+		try {
+			// Try to load existing model
+			model = await this.loadModel(modelPath);
+			console.log(
+				'Existing model loaded. Performing incremental learning.',
+			);
+
+			// Fine-tuning: Freeze all layers except the last two
+			for (let i = 0; i < model.layers.length - 2; i++) {
+				model.layers[i].trainable = false;
+			}
+
+			// Recompile with a lower learning rate for fine-tuning
+			const learningRate = 0.001;
+			const newOptimizer = tf.train.adam(learningRate);
+			model.compile({
+				optimizer: newOptimizer,
+				loss: loss,
+				metrics: ['mse'], // bài toán regression
+				// metrics: ['accuracy'], // classification
+			});
+		} catch (error) {
+			console.log('No existing model found. Creating a new model.');
+			model = await this.createNewModel(
+				optimizer,
+				loss,
+				WINDOW_LENGTH,
+				numberOfFeatures,
+			);
+		}
+
+		let lastEpochLogs;
+
+		// Train the model
+		await model.fit(trainTensor, labelTensor, {
+			epochs,
+			shuffle: true,
+			callbacks: {
+				onEpochEnd: (epoch, logs) => {
+					lastEpochLogs = logs;
+					// console.log(
+					// 	`Epoch ${epoch + 1}: loss = ${logs.loss}, accuracy = ${logs.acc}`,
+					// );
+				},
+			},
+		});
+
+		const savePath = await this.saveModel(
+			model,
+			lotteryType,
+			optimizer,
+			loss,
+		);
+
+		// Clean up tensors
+		// trainTensor.dispose();
+		// labelTensor.dispose();
+
+		if (lastEpochLogs) {
+			await this.saveAccuracy(savePath, lastEpochLogs.acc);
+		}
+		return { model, modelPath: savePath, lastEpochLogs };
+	}
