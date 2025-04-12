@@ -32,6 +32,12 @@ interface Metrics {
 export class PredictService {
 	constructor(private readonly redisService: RedisService) {}
 	private CACHE_PREFIX = 'lottery_data';
+	private readonly lossFunctions = {
+		meanSquaredError: 'meanSquaredError',
+		meanAbsoluteError: 'meanAbsoluteError',
+		// huberLoss: (yTrue, yPred) =>
+		// 	tf.losses.huberLoss(yTrue, yPred, undefined, 1.0),
+	};
 
 	private getModelPath(
 		lotteryType: LotteryType,
@@ -262,9 +268,13 @@ export class PredictService {
 
 			model.compile({
 				optimizer: newOptimizer,
-				loss: loss,
+				loss,
+				// 	typeof this.lossFunctions[loss] === 'string'
+				// 		? this.lossFunctions[loss]
+				// 		: this.lossFunctions[loss] || tf.losses.huberLoss,
 				metrics: ['mse', 'mae', 'accuracy'],
 			});
+
 			isIncremental = true;
 		} catch (error) {
 			// Tạo mới mô hình
@@ -279,13 +289,13 @@ export class PredictService {
 
 		let lastEpochLogs;
 
-		// Huấn luyện mô hình
+		// Train
 		await model.fit(trainTensor, labelTensor, {
 			epochs,
 			shuffle: true,
 			callbacks: {
 				onEpochEnd: (epoch, logs) => {
-					console.log('lastEpochLogs', lastEpochLogs);
+					// console.log('lastEpochLogs', lastEpochLogs);
 					lastEpochLogs = logs;
 				},
 			},
@@ -322,22 +332,23 @@ export class PredictService {
 		loss: string,
 		epochs: number,
 	) {
-		const lotteryHistory = await this.redisService.get(
+		const lotteryData = await this.redisService.get(
 			this.CACHE_PREFIX,
 			lotteryType,
 		);
 
-        throw new NotFoundException(`History not found`);
+		if (!lotteryData) {
+			throw new NotFoundException(`History not found`);
+		}
 
-        if (!lotteryHistory) {
-            return;
-        } 
-        
-        // return JSON.parse(lotteryHistory);
+		const parseData = JSON.parse(lotteryData);
+		const lotteryHistory = parseData.map((item) =>
+			item.numbers.map((num: string) => Number(num)),
+		);
 
-        const maxNumber = MAX_NUMBER[lotteryType];
-		const numberOfFeatures = NUMBERS[lotteryType];
 		const numberOfRows = lotteryHistory.length;
+		const maxNumber = MAX_NUMBER[lotteryType];
+		const numberOfFeatures = NUMBERS[lotteryType];
 
 		if (numberOfRows <= WINDOW_LENGTH) {
 			throw new Error(
@@ -346,9 +357,9 @@ export class PredictService {
 		}
 
 		const scaledLotteryHistory = lotteryHistory.map((row) => {
-			const numbers = Array.isArray(row.numbers)
-				? row.numbers.slice(0, 6)
-				: [];
+			const numbers = Array.isArray(row)
+				? row.slice(0, 6)
+				: Object.values(row).slice(0, 6);
 			if (numbers.length !== 6) {
 				throw new Error(
 					`Each lottery draw must contain exactly 6 numbers, got ${numbers.length}`,
@@ -398,13 +409,13 @@ export class PredictService {
 
 		model.compile({
 			optimizer: newOptimizer,
-			loss: loss,
+			loss,
 			metrics: ['mse', 'mae', 'accuracy'],
 		});
 
 		let lastEpochLogs;
 
-		// Huấn luyện mô hình
+		// Train
 		await model.fit(trainTensor, labelTensor, {
 			epochs,
 			shuffle: true,
@@ -415,7 +426,7 @@ export class PredictService {
 			},
 		});
 
-		// Lưu mô hình
+		// Save
 		const savePath = await this.saveModel(
 			model,
 			lotteryType,
@@ -724,7 +735,6 @@ async function handlePredict() {
 */
 
 // Feature Engineering: Thêm các thuộc tính mới vào dữ liệu đầu vào:
-
 // Tần suất xuất hiện của các số
 // Khoảng thời gian giữa các lần xuất hiện
 // Các mẫu tuần hoàn trong lịch sử

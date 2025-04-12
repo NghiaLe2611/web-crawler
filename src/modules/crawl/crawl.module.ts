@@ -5,6 +5,8 @@ import { Mega645, Mega645Schema } from 'src/common/schemas/mega645.schema';
 import { Power655, Power655Schema } from 'src/common/schemas/power655.schema';
 import { CrawlController } from './crawl.controller';
 import { CrawlService } from './crawl.service';
+import { HttpModule } from '@nestjs/axios';
+import { ConfigModule } from '@nestjs/config';
 
 @Module({
 	imports: [
@@ -19,6 +21,7 @@ import { CrawlService } from './crawl.service';
 			{ name: Mega645.name, schema: Mega645Schema },
 			{ name: Power655.name, schema: Power655Schema },
 		]),
+		HttpModule,
 		// RedisModule
 	],
 	controllers: [CrawlController],

@@ -519,8 +519,6 @@ export class CrawlService implements OnModuleInit {
 				.limit(limit)
 				.exec();
 
-			return data;
-
 			// Cache the results
 			// await this.redisService.set(
 			// 	this.CACHE_PREFIX,

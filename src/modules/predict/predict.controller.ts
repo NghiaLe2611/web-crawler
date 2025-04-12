@@ -7,12 +7,14 @@ import {
 	NotFoundException,
 	Post,
 	Res,
+    UseGuards,
 } from '@nestjs/common';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { COMMON_ERR_MESSAGE, DEFAULT_PREDICT_PARAMS } from 'src/constants';
 import { LotteryType } from 'src/types';
 import { PredictService } from './predict.service';
+import { PermissionGuard } from '@/guards/permission.guard';
 
 class TrainModelDto {
 	data: number[][];
@@ -33,6 +35,7 @@ export class PredictController {
 	constructor(private readonly predictService: PredictService) {}
 
 	@Post('/train')
+	@UseGuards(PermissionGuard)
 	async handleTrainModel(@Body() model: TrainModelDto, @Res() res: any) {
 		const { data, optimizer, loss, epochs, lotteryType } = model;
 		if (!data || !data?.length) {
@@ -79,6 +82,7 @@ export class PredictController {
 	}
 
 	@Post('/trainAll')
+	@UseGuards(PermissionGuard)
 	async handleTrainAll(@Body() model: TrainModelDto, @Res() res: any) {
 		const { optimizer, loss, epochs, lotteryType } = model;
 
@@ -157,6 +161,7 @@ export class PredictController {
 	}
 
 	@Delete('/delete')
+	@UseGuards(PermissionGuard)
 	async handleDeleteModel(@Body() modelName: string, @Res() res: any) {
 		try {
 			const result = await this.predictService.cleanModel(modelName);
