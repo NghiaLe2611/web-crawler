@@ -40,21 +40,12 @@ export class AuthController {
 				access_token: result.accessToken,
 			};
 		} catch (error) {
-			if (error.response && error.response.status === 401) {
-				throw new HttpException(
-					{
-						status: HttpStatus.UNAUTHORIZED,
-						message: 'Unauthorized',
-					},
-					HttpStatus.UNAUTHORIZED,
-				);
-			}
 			throw new HttpException(
 				{
-					status: HttpStatus.INTERNAL_SERVER_ERROR,
-					message: error?.message || 'Internal server error',
+					status: error?.status ?? HttpStatus.UNAUTHORIZED,
+					message: error?.message ?? 'Unauthorized',
 				},
-				HttpStatus.INTERNAL_SERVER_ERROR,
+				error?.status ?? HttpStatus.UNAUTHORIZED,
 			);
 		}
 	}
