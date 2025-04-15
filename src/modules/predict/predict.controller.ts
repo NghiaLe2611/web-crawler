@@ -2,6 +2,7 @@ import {
 	Body,
 	Controller,
 	Delete,
+	Get,
 	HttpException,
 	HttpStatus,
 	NotFoundException,
@@ -35,7 +36,7 @@ export class PredictController {
 	constructor(private readonly predictService: PredictService) {}
 
 	@Post('/train')
-	@UseGuards(PermissionGuard)
+	// @UseGuards(PermissionGuard)
 	async handleTrainModel(@Body() model: TrainModelDto, @Res() res: any) {
 		const { data, optimizer, loss, epochs, lotteryType } = model;
 		if (!data || !data?.length) {
@@ -82,7 +83,7 @@ export class PredictController {
 	}
 
 	@Post('/trainAll')
-	@UseGuards(PermissionGuard)
+	// @UseGuards(PermissionGuard)
 	async handleTrainAll(@Body() model: TrainModelDto, @Res() res: any) {
 		const { optimizer, loss, epochs, lotteryType } = model;
 
@@ -161,13 +162,30 @@ export class PredictController {
 	}
 
 	@Delete('/delete')
-	@UseGuards(PermissionGuard)
+	// @UseGuards(PermissionGuard)
 	async handleDeleteModel(@Body() modelName: string, @Res() res: any) {
 		try {
 			const result = await this.predictService.cleanModel(modelName);
 			return res.status(HttpStatus.OK).json({
 				statusCode: HttpStatus.OK,
 				message: 'Delete model successfully !',
+			});
+		} catch (error) {
+			throw new HttpException(
+				error.message,
+				HttpStatus.INTERNAL_SERVER_ERROR,
+			);
+		}
+	}
+
+	@Get('/train-history')
+	// @UseGuards(PermissionGuard)
+	async trainHistory(@Res() res: any) {
+		try {
+			const result = await this.predictService.getTrainHistory();
+			return res.status(HttpStatus.OK).json({
+				statusCode: HttpStatus.OK,
+                data: result
 			});
 		} catch (error) {
 			throw new HttpException(

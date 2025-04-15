@@ -1,10 +1,14 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { RedisService } from '@nghiale/redis-module';
 import * as tf from '@tensorflow/tfjs-node';
 import * as fs from 'fs';
 import * as path from 'path';
 import { MAX_NUMBER, NUMBERS } from 'src/constants';
 import { LotteryType } from 'src/types';
-import { RedisService } from '../redis/redis.service';
+import { CreateTrainDto } from './dtos/create-train.dto';
+import { InjectModel } from '@nestjs/mongoose';
+import { TrainModelHistory } from '@/common/schemas/train_history.schema';
+import { Model } from 'mongoose';
 
 // Window Size (w): Determines the number of previous data points used as input features to predict the next data point.
 const WINDOW_LENGTH = 2;
@@ -30,7 +34,11 @@ interface Metrics {
 
 @Injectable()
 export class PredictService {
-	constructor(private readonly redisService: RedisService) {}
+	constructor(
+		private readonly redisService: RedisService,
+		@InjectModel(TrainModelHistory.name)
+		private trainModelHistory: Model<TrainModelHistory>,
+	) {}
 	private CACHE_PREFIX = 'lottery_data';
 	private readonly lossFunctions = {
 		meanSquaredError: 'meanSquaredError',
@@ -317,6 +325,13 @@ export class PredictService {
 			// MSE càng nhỏ càng tốt, accuracy ngược lại
 		}
 
+		// Save train history
+		await this.createOrUpdate({
+			type: lotteryType,
+			optimizer,
+			loss,
+		});
+
 		return {
 			model,
 			modelPath: savePath,
@@ -442,6 +457,13 @@ export class PredictService {
 			await this.saveMetrics(savePath, lastEpochLogs);
 		}
 
+		// Save train history
+		await this.createOrUpdate({
+			type: lotteryType,
+			optimizer,
+			loss,
+		});
+
 		return {
 			model,
 			modelPath: savePath,
@@ -523,6 +545,30 @@ export class PredictService {
 				`Error deleting folder ${modelName}: ${error.message}`,
 			);
 		}
+	}
+
+	async createOrUpdate(dto: CreateTrainDto) {
+		return this.trainModelHistory.findOneAndUpdate(
+			{
+				type: dto.type,
+				optimizer: dto.optimizer,
+				loss: dto.loss,
+			},
+			{ ...dto },
+			{ upsert: true, new: true },
+		);
+	}
+
+	async delete(dto: CreateTrainDto) {
+		return this.trainModelHistory.deleteOne({
+			type: dto.type,
+			optimizer: dto.optimizer,
+			loss: dto.loss,
+		});
+	}
+
+	async getTrainHistory() {
+		return this.trainModelHistory.find().sort({ createdAt: -1 }).exec();
 	}
 
 	// predict(data) {

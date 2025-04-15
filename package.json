@@ -31,6 +31,7 @@
     "@nestjs/mongoose": "^11.0.1",
     "@nestjs/platform-express": "^10.0.0",
     "@nestjs/schedule": "^4.1.1",
+    "@nghiale/redis-module": "file:../redis-module/nghiale-redis-module-1.0.0.tgz",
     "@tensorflow/tfjs-node": "^4.20.0",
     "@types/webgl-ext": "^0.0.37",
     "cache-manager": "^5.7.6",

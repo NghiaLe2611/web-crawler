@@ -2,14 +2,13 @@
 
 import { HttpService } from '@nestjs/axios';
 import {
-	CanActivate,
-	ExecutionContext,
-	ForbiddenException,
-	Injectable,
-	UnauthorizedException,
+    CanActivate,
+    ExecutionContext,
+    ForbiddenException,
+    Injectable,
+    UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { Reflector } from '@nestjs/core';
 import { firstValueFrom } from 'rxjs';
 
 @Injectable()

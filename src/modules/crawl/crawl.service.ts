@@ -26,7 +26,7 @@ import { convertToMongoDate } from '@/utils/date.utils';
 import { vi } from 'date-fns/locale';
 import { LotteryCrawlUrl, LotteryType } from 'src/types';
 import { GetDataDto } from '../../common/dtos/get-data.dto';
-import { RedisService } from '../redis/redis.service';
+import { RedisService } from '@nghiale/redis-module';
 
 interface LotteryData {
 	type: LotteryType;

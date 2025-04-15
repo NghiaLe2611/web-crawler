@@ -11,7 +11,7 @@ import {
 import { LotteryType } from 'src/types';
 import { CrawlService } from './crawl.service';
 import { GetDataDto } from '../../common/dtos/get-data.dto';
-import { PermissionGuard } from '@/guards/permission.guard';
+// import { PermissionGuard } from '@/guards/permission.guard';
 
 @Controller('crawl')
 export class CrawlController {
@@ -36,7 +36,7 @@ export class CrawlController {
 	// }
 
 	@Get('/save')
-	@UseGuards(PermissionGuard)
+	// @UseGuards(PermissionGuard)
 	async saveData(@Query('type') type: LotteryType) {
 		try {
 			const res = await this.crawlService.saveJsonFile(type);
@@ -54,7 +54,7 @@ export class CrawlController {
 
 	// Crawl and update data
 	@Get('/update')
-	@UseGuards(PermissionGuard)
+	// @UseGuards(PermissionGuard)
 	async updateData(
 		@Query('type') type: LotteryType,
 		@Query('isFull') isFull: boolean,
@@ -95,7 +95,7 @@ export class CrawlController {
 	}
 
 	@Post('/cache/:type')
-	@UseGuards(PermissionGuard)
+	// @UseGuards(PermissionGuard)
 	async cacheData(@Param('type') type: LotteryType): Promise<{
 		statusCode: number;
 		message: string;
