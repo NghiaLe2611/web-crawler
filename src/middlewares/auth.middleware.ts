@@ -60,16 +60,19 @@ export class AuthMiddleware implements NestMiddleware {
 			if (['super-admin', 'admin'].includes(user.role)) {
 				return next();
 			}
-
 			// Check detail permissions
 			const permissions: string[] = user.permissions || [];
-			if (!permissions.includes(permissionkey)) {
+			const checkPermission = this.isPublicRoute(
+				permissionkey,
+				permissions,
+			);
+
+			if (!checkPermission) {
 				throw new ForbiddenException(
 					`You do not have permission: ${permissionkey}`,
 				);
 			}
 
-			// Mọi việc OK, tiếp tục
 			return next();
 		} catch (err) {
 			if (
@@ -89,5 +92,24 @@ export class AuthMiddleware implements NestMiddleware {
 			return path.slice(0, -1);
 		}
 		return path;
+	}
+
+	isPublicRoute(key: string, permissionData: string[]): boolean {
+		const exactMatch = permissionData.find((item) => item === key);
+		if (exactMatch) return true;
+
+		// Check wildcard matches
+		for (const item of permissionData) {
+			if (item.includes('*')) {
+				const pattern = item.replace('*', '(.*)');
+				const regex = new RegExp(`^${pattern}$`);
+
+				if (regex.test(key)) {
+					return true;
+				}
+			}
+		}
+
+		return false;
 	}
 }

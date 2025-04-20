@@ -73,4 +73,36 @@ export class AuthService {
 			}
 		}
 	}
+
+	async loginWithGoogle(idToken: string) {
+		console.log('google login ', idToken);
+
+		try {
+			const result = await firstValueFrom(
+				this.authClient.send({ cmd: 'google-login' }, { idToken }),
+			);
+
+			// if (result && result?.accessToken) {
+			// 	return result;
+			// }
+
+			if (result.statusCode === HttpStatus.OK) {
+				return result;
+			}
+
+			throw new HttpException(
+				result.message || 'Authentication failed',
+				result.status || HttpStatus.UNAUTHORIZED,
+			);
+		} catch (err) {
+			if (err instanceof HttpException) {
+				throw err;
+			} else {
+				throw new HttpException(
+					'Authentication service unavailable',
+					HttpStatus.SERVICE_UNAVAILABLE,
+				);
+			}
+		}
+	}
 }

@@ -1,24 +1,24 @@
 import {
-	Body,
-	Controller,
-	Delete,
-	Get,
-	HttpCode,
-	HttpException,
-	HttpStatus,
-	Param,
-	Patch,
-	Post,
-	Put,
-	Query,
-	Res,
+    Body,
+    Controller,
+    Delete,
+    Get,
+    HttpCode,
+    HttpException,
+    HttpStatus,
+    Param,
+    Patch,
+    Post,
+    Query,
+    Req,
+    Res
 } from '@nestjs/common';
-import { HistoryService } from './history.service';
-import {
-	CreatePredictHistoryDto,
-	UpdatePredictHistoryDto,
-} from './dtos/history.dto';
 import { GetDataDto } from '../../common/dtos/get-data.dto';
+import {
+    CreatePredictHistoryDto,
+    UpdatePredictHistoryDto,
+} from './dtos/history.dto';
+import { HistoryService } from './history.service';
 
 @Controller('history')
 export class HistoryController {
@@ -26,13 +26,17 @@ export class HistoryController {
 
 	@Post()
 	@HttpCode(HttpStatus.CREATED)
-	async create(
+	async createPredict(
 		@Body() createHistoryDto: CreatePredictHistoryDto,
 		@Res() res: any,
+		@Req() req,
 	) {
 		try {
-			const data =
-				await this.historyService.create(createHistoryDto);
+			const userId = req.user;
+			const data = await this.historyService.create(
+				createHistoryDto,
+				userId,
+			);
 			return res.status(200).json({
 				statusCode: HttpStatus.OK,
 				data,
@@ -50,9 +54,10 @@ export class HistoryController {
 	}
 
 	@Get()
-	async getData(@Query() query: GetDataDto) {
+	async getData(@Req() req, @Query() query: GetDataDto) {
 		try {
-			const res = await this.historyService.findAll(query);
+			const userId = req.user;
+			const res = await this.historyService.findAll(query, userId);
 			return { data: res, count: res.length, statusCode: HttpStatus.OK };
 		} catch (error) {
 			throw new HttpException(
@@ -89,7 +94,7 @@ export class HistoryController {
 	// }
 
 	@Get(':id')
-	async findById(@Param('id') id: string) {
+	async findPredict(@Param('id') id: string) {
 		try {
 			const res = await this.historyService.findById(id);
 			return { data: res, statusCode: HttpStatus.OK };
@@ -103,12 +108,17 @@ export class HistoryController {
 
 	// @Put(':id')
 	@Patch(':id')
-	async update(
+	async updatePredict(
 		@Param('id') id: string,
 		@Body() updateHistoryDto: UpdatePredictHistoryDto,
+		@Req() req,
 	) {
 		try {
-			const res = await this.historyService.update(id, updateHistoryDto);
+			const userId = req.user;
+			const res = await this.historyService.update(id, {
+				...updateHistoryDto,
+				userId,
+			});
 			return {
 				data: res,
 				statusCode: HttpStatus.OK,
@@ -124,9 +134,10 @@ export class HistoryController {
 
 	@Delete(':id')
 	// @HttpCode(HttpStatus.NO_CONTENT)
-	async delete(@Param('id') id: string) {
+	async deletePredict(@Req() req, @Param('id') id: string) {
 		try {
-			const res = await this.historyService.delete(id);
+			const userId = req.user;
+			const res = await this.historyService.delete(id, userId);
 			return {
 				// data: res,
 				statusCode: HttpStatus.OK,

@@ -1,7 +1,7 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { LotteryType } from '@/types/index';
 
-import { Document } from 'mongoose';
+import { Document, Schema as MongooseSchema } from 'mongoose';
 
 export interface HistoryBase {
 	date: string;
@@ -31,7 +31,15 @@ export class PredictHistory {
 		default: false,
 	})
 	isAI?: boolean;
+
+	@Prop({
+		type: MongooseSchema.Types.ObjectId,
+		// ref: 'User',
+		required: true,
+	})
+	userId: string;
 }
 
 export const PredictHistorySchema =
 	SchemaFactory.createForClass(PredictHistory);
+// PredictHistorySchema.index({ userId: 1, date: -1 });

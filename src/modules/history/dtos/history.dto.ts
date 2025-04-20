@@ -74,4 +74,7 @@ export class UpdatePredictHistoryDto implements Partial<PredictHistoryDto> {
 	@IsBoolean()
 	@IsOptional()
 	isAI?: boolean;
+
+	@IsString()
+	userId: string;
 }

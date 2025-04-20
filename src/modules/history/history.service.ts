@@ -1,17 +1,16 @@
+import { GetDataDto } from '@/common/dtos/get-data.dto';
+import { convertToMongoDate } from '@/utils/date.utils';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { format } from 'date-fns';
+import { Model, Types } from 'mongoose';
 import {
-	HistoryDocument,
-	PredictHistory,
+    PredictHistory
 } from 'src/common/schemas/history.schema';
 import {
-	CreatePredictHistoryDto,
-	UpdatePredictHistoryDto,
+    CreatePredictHistoryDto,
+    UpdatePredictHistoryDto,
 } from './dtos/history.dto';
-import { format } from 'date-fns';
-import { convertToMongoDate } from '@/utils/date.utils';
-import { GetDataDto } from '@/common/dtos/get-data.dto';
 
 @Injectable()
 export class HistoryService {
@@ -28,6 +27,7 @@ export class HistoryService {
 	// }
 	async create(
 		createHistoryDto: CreatePredictHistoryDto,
+		userId: string,
 	): Promise<PredictHistory> {
 		// Promise<{ data: PredictHistory; isUpdated?: boolean }>
 		// Extract date from the DTO
@@ -60,21 +60,23 @@ export class HistoryService {
 		// }
 
 		// Create new
-		const createdHistory = new this.historyModel(createHistoryDto);
+		const createdHistory = new this.historyModel({
+			...createHistoryDto,
+			userId,
+		});
 		const savedHistory = await createdHistory.save();
 		return savedHistory;
-		// return { data: savedHistory, isUpdated: false };
 	}
 
 	// async findAll(): Promise<PredictHistory[]> {
 	// 	return this.historyModel.find().exec();
 	// }
 
-	async findAll(query: GetDataDto) {
+	async findAll(query: GetDataDto, userId: string) {
 		try {
 			const limit = query.count ?? 100;
 			const lotteryModel = this.historyModel;
-			const dbQuery: any = { type: query.type };
+			const dbQuery: any = { type: query.type, userId: userId };
 
 			if (query.fromDate) {
 				const formattedFrom = convertToMongoDate(query.fromDate);
@@ -99,10 +101,15 @@ export class HistoryService {
 		return this.historyModel.find({ type }).exec();
 	}
 
+	// Schema.Types.ObjectId
 	async findById(id: string): Promise<PredictHistory> {
+        if (!Types.ObjectId.isValid(id)) {
+			throw new NotFoundException(`History with not found`);
+		}
+
 		const history = await this.historyModel.findById(id).exec();
 		if (!history) {
-			throw new NotFoundException(`History with ID ${id} not found`);
+			throw new NotFoundException(`History with not found`);
 		}
 		return history;
 	}
@@ -118,19 +125,19 @@ export class HistoryService {
 			.findByIdAndUpdate(id, { $set: updateHistoryDto }, { new: true })
 			.exec();
 		if (!updatedHistory) {
-			throw new NotFoundException(`History with ID ${id} not found`);
+			throw new NotFoundException(`History not found`);
 		}
 
 		return updatedHistory;
 	}
 
-	async delete(id: string): Promise<PredictHistory> {
+	async delete(id: string, userId: string): Promise<PredictHistory> {
 		const deletedHistory = await this.historyModel
-			.findByIdAndDelete(id)
+			.findOneAndDelete({ _id: id, userId })
 			.exec();
 
 		if (!deletedHistory) {
-			throw new NotFoundException(`History with ID ${id} not found`);
+			throw new NotFoundException(`History not found`);
 		}
 
 		return deletedHistory;

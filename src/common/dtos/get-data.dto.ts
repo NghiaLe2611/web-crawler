@@ -1,6 +1,6 @@
-import { LotteryType } from 'src/types';
-import { IsEnum, IsInt, IsOptional, Matches } from 'class-validator';
 import { Type } from 'class-transformer';
+import { IsEnum, IsInt, IsOptional, Matches } from 'class-validator';
+import { LotteryType } from 'src/types';
 
 export class GetDataDto {
 	@IsOptional()
@@ -22,4 +22,7 @@ export class GetDataDto {
 		message: 'toDate must be in format dd-MM-yyyy',
 	})
 	toDate?: string;
+
+	// @IsString()
+	// userId: string;
 }

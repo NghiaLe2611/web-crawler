@@ -15,7 +15,7 @@ import * as path from 'path';
 import { COMMON_ERR_MESSAGE, DEFAULT_PREDICT_PARAMS } from 'src/constants';
 import { LotteryType } from 'src/types';
 import { PredictService } from './predict.service';
-import { PermissionGuard } from '@/guards/permission.guard';
+// import { PermissionGuard } from '@/guards/permission.guard';
 
 class TrainModelDto {
 	data: number[][];

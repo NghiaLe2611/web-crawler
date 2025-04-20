@@ -10,7 +10,7 @@ import {
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 // import { AuthGuard } from '@/guards/auth.guard';
-import { PermissionGuard } from '@/guards/permission.guard';
+// import { PermissionGuard } from '@/guards/permission.guard';
 
 @Controller('auth')
 export class AuthController {
@@ -34,6 +34,26 @@ export class AuthController {
 	async login(@Body() loginDto: LoginDto) {
 		try {
 			const result = await this.authService.login(loginDto);
+			return {
+				status: HttpStatus.OK,
+				message: 'Login successfully !',
+				access_token: result.accessToken,
+			};
+		} catch (error) {
+			throw new HttpException(
+				{
+					status: error?.status ?? HttpStatus.UNAUTHORIZED,
+					message: error?.message ?? 'Unauthorized',
+				},
+				error?.status ?? HttpStatus.UNAUTHORIZED,
+			);
+		}
+	}
+
+	@Post('google')
+	async googleLogin(@Body() body: { idToken: string }) {
+		try {
+			const result = await this.authService.loginWithGoogle(body.idToken);
 			return {
 				status: HttpStatus.OK,
 				message: 'Login successfully !',
