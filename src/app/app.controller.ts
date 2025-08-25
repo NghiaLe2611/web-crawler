@@ -7,6 +7,11 @@ export class AppController {
 	constructor(private readonly appService: AppService) {}
 
 	@Get()
+	getHello(): string {
+		return this.appService.getHello();
+	}
+    
+	@Get()
 	async getStatus(@Req() req: Request, @Res() res: Response) {
 		// Inject Request object
 		try {
