@@ -125,6 +125,18 @@ export class CrawlService implements OnModuleInit {
 		try {
 			const browser = await puppeteer.launch({
 				ignoreHTTPSErrors: true,
+                args: [
+                    '--no-sandbox',
+                    '--disable-setuid-sandbox',
+                    '--disable-dev-shm-usage',
+                    '--disable-accelerated-2d-canvas',
+                    '--no-first-run',
+                    '--no-zygote',
+                    '--single-process',
+                    '--disable-gpu',
+                    '--disable-web-security',
+                    '--disable-features=VizDisplayCompositor'
+                ]
 			});
 			const page = await browser.newPage();
 			// page.setViewport({ width: 1280, height: 720 });
