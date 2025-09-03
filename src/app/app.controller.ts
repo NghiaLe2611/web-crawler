@@ -6,7 +6,7 @@ import { Request, Response } from 'express';
 export class AppController {
 	constructor(private readonly appService: AppService) {}
 
-	@Get()
+	@Get('/hello')
 	getHello(): string {
 		return this.appService.getHello();
 	}
@@ -21,7 +21,7 @@ export class AppController {
 				statusCode: HttpStatus.OK,
 				message: 'OK',
 				env: process.env.NODE_ENV || 'development',
-				user: process.env.TEST_USER || null,
+				// user: process.env.TEST_USER || null,
 			});
 		} catch (error) {
 			return res.json({

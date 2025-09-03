@@ -16,6 +16,7 @@ export class AuthMiddleware implements NestMiddleware {
 	) {}
 
 	async use(req: Request, res: Response, next: NextFunction) {
+        console.log('AuthMiddleware', req);
 		try {
 			// Check is public route
 			const appName = req.headers['app-name'] ?? 'lottery';
@@ -31,6 +32,10 @@ export class AuthMiddleware implements NestMiddleware {
 				),
 			);
 
+            console.log({
+				fullPath, permissionkey, isPublicResponse
+			});
+
 			if (isPublicResponse?.isPublic === true) {
 				return next();
 			}
@@ -45,6 +50,8 @@ export class AuthMiddleware implements NestMiddleware {
 			const user = await firstValueFrom(
 				this.authClient.send({ cmd: 'verify_user' }, { token }),
 			);
+
+            console.log({ user });
 
 			if (!user) {
 				throw new UnauthorizedException();
@@ -75,6 +82,7 @@ export class AuthMiddleware implements NestMiddleware {
 
 			return next();
 		} catch (err) {
+            console.log('AuthMiddleware error', err);
 			if (
 				err instanceof UnauthorizedException ||
 				err instanceof ForbiddenException
