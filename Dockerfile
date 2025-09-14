@@ -1,5 +1,5 @@
 # Use the official Node.js image from the Docker Hub
-FROM node:18
+FROM node:18-slim
 
 # We don't need the standalone Chromium
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD true

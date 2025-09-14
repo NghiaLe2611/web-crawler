@@ -53,7 +53,7 @@ export class CrawlController {
 	}
 
 	// Crawl and update data
-	@Get('/update')
+	@Post('/update')
 	// @UseGuards(PermissionGuard)
 	async updateData(
 		@Query('type') type: LotteryType,
