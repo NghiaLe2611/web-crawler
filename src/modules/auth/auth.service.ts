@@ -63,6 +63,12 @@ export class AuthService {
 				result.status || HttpStatus.UNAUTHORIZED,
 			);
 		} catch (err) {
+			if (err.statusCode === HttpStatus.FORBIDDEN) {
+				throw new HttpException(
+					err?.message || 'Authentication service unavailable',
+					HttpStatus.SERVICE_UNAVAILABLE,
+				);
+			}
 			if (err instanceof HttpException) {
 				throw err;
 			} else {

@@ -16,7 +16,7 @@ export class AuthMiddleware implements NestMiddleware {
 	) {}
 
 	async use(req: Request, res: Response, next: NextFunction) {
-        console.log('AuthMiddleware', req);
+        // console.log('AuthMiddleware', req);
 		try {
 			// Check is public route
 			const appName = req.headers['app-name'] ?? 'lottery';
